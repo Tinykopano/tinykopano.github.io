@@ -1,5 +1,5 @@
 ---
-title: NapReduce
+title: MapReduce
 author: kopano
 date: 2022-09-09 14:10:00 +0800
 categories: [Paper]

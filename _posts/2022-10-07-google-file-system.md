@@ -1,10 +1,11 @@
 ---
 title: Google File System
 author: kopano
-date: 2022-10-10 14:10:00 +0800
+date: 2022-10-07 14:10:00 +0800
 categories: [Paper]
 tags: [google,big data]
 ---
+
 # Google论文之二----Google File System
 
 ## 摘要
