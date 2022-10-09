@@ -2,8 +2,8 @@
 title: MapReduce
 author: kopano
 date: 2022-09-09 14:10:00 +0800
-categories: [Paper]
-tags: [google,big data]
+categories: [Course,Paper]
+tags: [distributed system,big data]
 ---
 
 # Google论文之一----MapReduce

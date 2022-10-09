@@ -2,8 +2,8 @@
 title: Google File System
 author: kopano
 date: 2022-10-07 14:10:00 +0800
-categories: [Paper]
-tags: [google,big data]
+categories: [Course,Paper]
+tags: [distributed system,big data]
 ---
 
 # Google论文之二----Google File System
