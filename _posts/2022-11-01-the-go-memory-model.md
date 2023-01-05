@@ -1,7 +1,7 @@
 ---
 title: The Go Memory Model
 author: kopano
-date: 2022-10-01 14:22:00 +0800
+date: 2022-11-01 14:22:00 +0800
 categories: [Course,Document]
 tags: [programming language, go]
 ---
