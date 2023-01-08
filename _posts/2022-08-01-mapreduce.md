@@ -1,5 +1,5 @@
 ---
-title: MapReduce: Simplified Data Processing on Large Clusters
+title: MapReduce:&nbsp;Simplified Data Processing on Large Clusters
 author: kopano
 date: 2022-08-01 10:10:00 +0800
 categories: [Course,Paper]
