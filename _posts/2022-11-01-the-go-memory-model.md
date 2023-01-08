@@ -6,7 +6,7 @@ categories: [Course,Document]
 tags: [programming language, go]
 ---
 
-# Go语言文档----The Go Memory Model
+# Go内存模型
 Version of June 6, 2022
 
 ## 介绍

@@ -1,12 +1,12 @@
 ---
-title: MapReduce
+title: MapReduce: Simplified Data Processing on Large Clusters
 author: kopano
 date: 2022-08-01 10:10:00 +0800
 categories: [Course,Paper]
 tags: [distributed system,big data]
 ---
 
-# Google论文之一----MapReduce
+# MapReduce: 大型集群上的简化数据处理
 
 ## 摘要
 

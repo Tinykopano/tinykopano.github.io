@@ -1,12 +1,12 @@
 ---
-title: Google File System
+title: The Google File System
 author: kopano
 date: 2022-09-01 14:10:00 +0800
 categories: [Course,Paper]
 tags: [distributed system,big data]
 ---
 
-# Google论文之二----Google File System
+# Google文件系统
 
 ## 摘要
 GFS（Google File System）是由我们设计并实现的为大规模分布式数据密集型应用程序设计的可伸缩的分布式文件系统。GFS为在廉价商用设备上运行提供了容错能力，并可以在有大量客户端的情况下提供较高的整体性能。

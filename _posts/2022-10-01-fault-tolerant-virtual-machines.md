@@ -1,12 +1,12 @@
 ---
-title: Fault-Tolerant Virtual Machines
+title: The Design for a Practical System for Fault-Tolerant Virtual Machines
 author: kopano
 date: 2022-10-01 14:22:00 +0800
 categories: [Course,Paper]
-tags: [distributed system]
+tags: [distributed system, virtual machine]
 ---
 
-# 分布式论文之----Fault-Tolerant Virtual Machines
+# 一种实用的容错虚拟机系统的设计
 
 ## 摘要
 
