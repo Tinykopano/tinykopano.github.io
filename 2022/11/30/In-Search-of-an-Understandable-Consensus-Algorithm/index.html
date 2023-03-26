@@ -6,12 +6,12 @@
   
   <title>In Search of an Understandable Consensus Algorithm (Extended Version) | KoPaNo&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="寻找一种可理解的共识算法摘要Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并强制执行程度的一致性，以减少必须考虑的状态数量。一个用户研究的结果结果表明">
+  <meta name="description" content="寻找一种可理解的共识算法摘要Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明，Ra">
 <meta property="og:type" content="article">
 <meta property="og:title" content="In Search of an Understandable Consensus Algorithm (Extended Version)">
 <meta property="og:url" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/index.html">
 <meta property="og:site_name" content="KoPaNo&#39;s Blog">
-<meta property="og:description" content="寻找一种可理解的共识算法摘要Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并强制执行程度的一致性，以减少必须考虑的状态数量。一个用户研究的结果结果表明">
+<meta property="og:description" content="寻找一种可理解的共识算法摘要Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明，Ra">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure01.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure02.JPG">
@@ -22,7 +22,7 @@
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure07.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure08.JPG">
 <meta property="article:published_time" content="2022-11-30T22:22:00.000Z">
-<meta property="article:modified_time" content="2023-03-26T04:16:16.782Z">
+<meta property="article:modified_time" content="2023-03-26T04:24:38.422Z">
 <meta property="article:author" content="KoPaNo">
 <meta property="article:tag" content="distributed system">
 <meta property="article:tag" content="consensus algorithm">
@@ -111,10 +111,10 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        <h1 id="寻找一种可理解的共识算法"><a href="#寻找一种可理解的共识算法" class="headerlink" title="寻找一种可理解的共识算法"></a>寻找一种可理解的共识算法</h1><h2 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h2><p>Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并强制执行程度的一致性，以减少必须考虑的状态数量。一个用户研究的结果结果表明，Raft比Paxos更容易被学生掌握。Raft还包括一个新的机制来改变群集成员的新机制，它使用重叠多数来保证安全。</p>
+        <h1 id="寻找一种可理解的共识算法"><a href="#寻找一种可理解的共识算法" class="headerlink" title="寻找一种可理解的共识算法"></a>寻找一种可理解的共识算法</h1><h2 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h2><p>Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明，Raft比Paxos更容易被学生掌握。Raft还包括一个新的机制来改变群集成员，它使用重叠多数来保证安全。</p>
 <span id="more"></span>
 
-<h2 id="一、-引言"><a href="#一、-引言" class="headerlink" title="一、  引言"></a>一、  引言</h2><p>共识算法允许一组机器作为一个连贯的团体工作，可以在一些成员的故障中幸存下来。正因为如此，它们在构建可靠的大规模软件系统中发挥了关键作用。Paxos[15, 16]在过去十年中主导了关于共识算法的讨论：大多数共识的实现都是基于Paxos或受其影响，Paxos已经成为教学生了解共识的主要工具。</p>
+<h2 id="一、-引言"><a href="#一、-引言" class="headerlink" title="一、  引言"></a>一、  引言</h2><p>共识算法允许一组机器作为一致的团体工作，可以在一些成员的故障中幸存下来。正因为如此，它们在构建可靠的大规模软件系统中发挥了关键作用。Paxos[15, 16]在过去十年中主导了关于共识算法的讨论：大多数共识的实现都是基于Paxos或受其影响，Paxos已经成为教学生了解共识的主要工具。</p>
 <p>不幸的是，Paxos是相当难以理解的，尽管有许多尝试使它更容易理解。此外，它的结构需要复杂的变化以支持实际的系统。因此，无论是系统 构建者和学生都在为Paxos而努力。</p>
 <p>在我们为Paxos努力之后，我们开始寻找一种新的共识算法，为系统建设和教育提供一个更好的基础。我们的方法与普通方法不同，因为我们的主要目标是可理解性：我们能否为实用系统定义一个共识算法，并以一种明显比Paxos更容易学习的方式来描述它？此外，我们希望该算法能够促进直觉的发展，这对系统建设者来说是至关重要的。重要的是，不仅要让算法发挥作用，而且要让它显而易见地发挥作用。</p>
 <p>这项工作的结果是一种叫做Raft的共识算法。在设计Raft的过程中，我们应用了特定的技术来提高可理解性，包括分解（Raft将领导者选举、日志复制和安全分开）和减少状态空间（相对于Paxos，Raft减少了非确定性的程度和服务器之间的不一致方式）。对两所大学的43名学生进行的用户研究表明，Raft明显比Paxos更容易理解：在学习了两种算法之后，这些学生中有33人能够更好地回答有关Raft的问题，而不是有关Paxos的问题。</p>
@@ -244,7 +244,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/" data-id="clfow1dcs0000gjoq9xokas6w" data-title="In Search of an Understandable Consensus Algorithm (Extended Version)" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/" data-id="clfowc80w0000gdovgjjk99tn" data-title="In Search of an Understandable Consensus Algorithm (Extended Version)" class="article-share-link">Share</a>
       
       
       
