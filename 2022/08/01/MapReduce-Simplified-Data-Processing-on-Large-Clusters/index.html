@@ -13,19 +13,18 @@
 <meta property="og:site_name" content="KoPaNo&#39;s Blog">
 <meta property="og:description" content="MapReduce: 大型集群上的简化数据处理摘要MapReduce是一个设计模型，也是一个处理和产生海量数据的一个相关实现。用户指定一个用于处理一个键值（key-value）对生成一组key&#x2F;value对形式的中间结果的map函数，以及一个将中间结果键相同的键值对合并到一起的reduce函数。许多现实世界的任务都能满足这个模型，如这篇文章所示。 使用这个功能形式实现的程序能够在大量的普">
 <meta property="og:locale" content="en_US">
-<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure01.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure01.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure02.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure03.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure04.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/table01.JPG">
 <meta property="article:published_time" content="2022-08-01T02:10:00.000Z">
-<meta property="article:modified_time" content="2023-03-26T03:45:20.050Z">
+<meta property="article:modified_time" content="2023-03-26T04:16:16.790Z">
 <meta property="article:author" content="KoPaNo">
 <meta property="article:tag" content="distributed system">
 <meta property="article:tag" content="big data">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure01.JPG">
+<meta name="twitter:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure01.JPG">
   
     <link rel="alternate" href="/atom.xml" title="KoPaNo's Blog" type="application/atom+xml">
   
@@ -88,6 +87,10 @@
   <time class="dt-published" datetime="2022-08-01T02:10:00.000Z" itemprop="datePublished">2022-08-01</time>
 </a>
     
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Course/">Course</a>►<a class="article-category-link" href="/categories/Course/Paper/">Paper</a>
+  </div>
+
   </div>
   <div class="article-inner">
     
@@ -107,6 +110,8 @@
         <h1 id="MapReduce-大型集群上的简化数据处理"><a href="#MapReduce-大型集群上的简化数据处理" class="headerlink" title="MapReduce: 大型集群上的简化数据处理"></a>MapReduce: 大型集群上的简化数据处理</h1><h2 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h2><p>MapReduce是一个设计模型，也是一个处理和产生海量数据的一个相关实现。用户指定一个用于处理一个键值（key-value）对生成一组key&#x2F;value对形式的中间结果的map函数，以及一个将中间结果键相同的键值对合并到一起的reduce函数。许多现实世界的任务都能满足这个模型，如这篇文章所示。</p>
 <p>使用这个功能形式实现的程序能够在大量的普通机器上并行执行。这个运行程序的系统关心下面的这些细节：输入数据的分区、一组机器上调度程序执行、处理机器失败问题，以及管理所需的机器内部的通信。这使没有任何并行处理和分布式系统经验的程序员能够利用这个大型分布式系统的资源。</p>
 <p>我们的MapReduce实现运行在一个由普通机器组成的大规模集群上，具有很高的可扩展性：一个典型的MapReduce计算会在几千台机器上处理许多TB的数据。程序员们发现这个系统很容易使用：目前已经实现了几百个MapReduce程序，在Google的集群上，每天有超过一千个的MapReduce工作在运行。</p>
+<span id="more"></span>
+
 <h2 id="一、-引言"><a href="#一、-引言" class="headerlink" title="一、  引言"></a>一、  引言</h2><p>在过去的5年中，本文作者和许多Google的程序员已经实现了数百个特定用途的计算程序，处理了海量的原始数据，包括抓取到的文档、网页请求日志等，计算各种衍生出来的数据，如反向索引、网页文档的图形结构的各种表示、每个host下抓取到的页面数量的总计、一个给定日期内的最频繁查询的集合等。大多数这种计算概念明确。然而，输入数据通常都很大，并且计算必须分布到数百或数千台机器上以确保在一个合理的时间内完成。如何并行计算、分布数据、处理错误等问题使这个起初很简单的计算，由于增加了处理这些问题的很多代码而变得十分复杂。</p>
 <p>为了解决这个复杂问题，我们设计了一个新的抽象模型，它允许我们将想要执行的计算简单的表示出来，而隐藏其中并行计算、容错、数据分布和负载均衡等很麻烦的细节。我们的抽象概念是受最早出现在lisp和其它结构性语言中的map和reduce启发的。我们认识到，大多数的计算包含对每个在输入数据中的逻辑记录执行一个map操作以获取一组中间key&#x2F;value对，然后对含有相同key的所有中间值执行一个reduce操作，以此适当的合并之前的衍生数据。由用户指定map和reduce操作的功能模型允许我们能够简单的进行并行海量计算，并使用re-execution作为主要的容错机制。</p>
 <p>这项工作的最大贡献是提供了一个简单的、强大的接口，使我们能够自动的进行并行和分布式的大规模计算，通过在由普通PC组成的大规模集群上实现高性能的接口来进行合并。</p>
@@ -140,7 +145,7 @@
 <p>（4）    存储是由直接装在不同机器上的便宜的IDE磁盘提供。一个内部的分布式文件系统用来管理存储这些磁盘上的数据。文件系统在不可靠的硬件上使用副本机制提供了可用性和可靠性。</p>
 <p>（5）    用户将工作提交给一个调度系统，每个工作由一个任务集组成，通过调度者映射到集群中可用机器的集合上。</p>
 <h3 id="3-1-执行概述"><a href="#3-1-执行概述" class="headerlink" title="3.1 执行概述"></a>3.1 执行概述</h3><p>通过自动的将输入数据分区成M个分片，Map调用被分配到多台机器上运行。数据的分片能够在不同的机器上并行处理。使用分区函数（如，hash(key) mod R）将中间结果的key进行分区成R个分片，Reduce调用也被分配到多台机器上运行。分区的数量（R）和分区函数是由用户指定的。</p>
-<p><img src="/assets/img/posts/20220801/figure01.JPG" alt="执行概述" title="执行概述"><br><img src="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure01.JPG" alt="执行概述" title="执行概述"></p>
+<p><img src="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure01.JPG" alt="执行概述" title="执行概述"></p>
 <div style="text-align: center;"><b>图1</b>：执行概述</div>
 
 <p>图1中显示了我们实现的一个MapReduce操作的整个流程。当用户程序调用MapReduce函数时，下面一系列的行为将会发生（图1中所使用的数字标识将与下面列表中的相对应）：</p>
@@ -263,7 +268,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/" data-id="clfouxkvq0004i6ox92ds5v6n" data-title="MapReduce: Simplified Data Processing on Large Clusters" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/" data-id="clfow1dcy0001gjoqdvkx1piq" data-title="MapReduce: Simplified Data Processing on Large Clusters" class="article-share-link">Share</a>
       
       
       
@@ -299,7 +304,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Categories</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/">Course</a><ul class="category-list-child"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Paper/">Paper</a></li></ul></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/">Course</a><ul class="category-list-child"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Document/">Document</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Paper/">Paper</a></li></ul></li></ul>
     </div>
   </div>
 
@@ -309,7 +314,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/big-data/" rel="tag">big data</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtual-machine/" rel="tag">virtual machine</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Raft/" rel="tag">Raft</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/big-data/" rel="tag">big data</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/consensus-algorithm/" rel="tag">consensus algorithm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/go/" rel="tag">go</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/programming-language/" rel="tag">programming language</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtual-machine/" rel="tag">virtual machine</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/zookeeper/" rel="tag">zookeeper</a></li></ul>
     </div>
   </div>
 
@@ -319,7 +324,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/big-data/" style="font-size: 15px;">big data</a> <a href="/tags/distributed-system/" style="font-size: 20px;">distributed system</a> <a href="/tags/virtual-machine/" style="font-size: 10px;">virtual machine</a>
+      <a href="/tags/Raft/" style="font-size: 10px;">Raft</a> <a href="/tags/big-data/" style="font-size: 15px;">big data</a> <a href="/tags/consensus-algorithm/" style="font-size: 10px;">consensus algorithm</a> <a href="/tags/distributed-system/" style="font-size: 20px;">distributed system</a> <a href="/tags/go/" style="font-size: 10px;">go</a> <a href="/tags/programming-language/" style="font-size: 10px;">programming language</a> <a href="/tags/virtual-machine/" style="font-size: 10px;">virtual machine</a> <a href="/tags/zookeeper/" style="font-size: 10px;">zookeeper</a>
     </div>
   </div>
 
@@ -328,7 +333,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Archives</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">October 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">September 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">August 2022</a></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">January 2023</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">December 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/11/">November 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">October 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">September 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">August 2022</a></li></ul>
     </div>
   </div>
 
@@ -341,15 +346,23 @@
       <ul>
         
           <li>
+            <a href="/2022/12/31/ZooKeeper-Wait-free-coordination-for-Internet-scale-systems/">ZooKeeper: Wait-free coordination for Internet-scale systems</a>
+          </li>
+        
+          <li>
+            <a href="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/">In Search of an Understandable Consensus Algorithm (Extended Version)</a>
+          </li>
+        
+          <li>
+            <a href="/2022/10/31/The-GO-Memory-Model/">The Go Memory Model</a>
+          </li>
+        
+          <li>
             <a href="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/">The Design for a Practical System for Fault-Tolerant Virtual Machines</a>
           </li>
         
           <li>
             <a href="/2022/08/31/The-Google-File-System/">The Google File System</a>
-          </li>
-        
-          <li>
-            <a href="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/">MapReduce: Simplified Data Processing on Large Clusters</a>
           </li>
         
       </ul>

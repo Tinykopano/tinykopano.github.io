@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>The Go Memory Model | KoPaNo&#39;s Blog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="Go内存模型Version of June 6, 2022 介绍Go 内存模型指定了以下条件,来保证在某一个goroutine中对一个变量进行读操作时,可以观察到在不同的GoRoutine中对该变量进行写操作产生的值。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The Go Memory Model">
+<meta property="og:url" content="https://tinykopano.github.io/2022/10/31/The-GO-Memory-Model/index.html">
+<meta property="og:site_name" content="KoPaNo&#39;s Blog">
+<meta property="og:description" content="Go内存模型Version of June 6, 2022 介绍Go 内存模型指定了以下条件,来保证在某一个goroutine中对一个变量进行读操作时,可以观察到在不同的GoRoutine中对该变量进行写操作产生的值。">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2022-10-31T22:22:00.000Z">
+<meta property="article:modified_time" content="2023-03-26T04:16:16.794Z">
+<meta property="article:author" content="KoPaNo">
+<meta property="article:tag" content="programming language">
+<meta property="article:tag" content="go">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="KoPaNo's Blog" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+    
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/typeface-source-code-pro@0.0.71/index.min.css">
+
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+<meta name="generator" content="Hexo 6.3.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">KoPaNo&#39;s Blog</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://tinykopano.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main"><article id="post-The-GO-Memory-Model" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2022/10/31/The-GO-Memory-Model/" class="article-date">
+  <time class="dt-published" datetime="2022-10-31T22:22:00.000Z" itemprop="datePublished">2022-11-01</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Course/">Course</a>►<a class="article-category-link" href="/categories/Course/Document/">Document</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="p-name article-title" itemprop="headline name">
+      The Go Memory Model
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="Go内存模型"><a href="#Go内存模型" class="headerlink" title="Go内存模型"></a>Go内存模型</h1><p>Version of June 6, 2022</p>
+<h2 id="介绍"><a href="#介绍" class="headerlink" title="介绍"></a>介绍</h2><p>Go 内存模型指定了以下条件,来保证在某一个goroutine中对一个变量进行读操作时,可以观察到在不同的GoRoutine中对该变量进行写操作产生的值。</p>
+<span id="more"></span>
+
+<h3 id="建议"><a href="#建议" class="headerlink" title="建议"></a>建议</h3><p>程序中改变的数据会被多个goroutine同时访问时,必须序列化此类访问。</p>
+<p>若要序列化访问,请使用通道操作或其他同步原语保护数据,例如 sync 和 sync&#x2F;atomic 中的那些。</p>
+<p>如果你必须阅读本文档的其余部分才能了解你的程序的行为, 那你可太聪明了。</p>
+<p>不要自作聪明。</p>
+<h3 id="非正式概述"><a href="#非正式概述" class="headerlink" title="非正式概述"></a>非正式概述</h3><p>Go 以与语言其他部分大致相同的方式处理其内存模型, 旨在保持语义简单、易懂和有用。 本节概述了该方法,对于大多数程序员来说应该足够了。 内存模型将在下一节中更正式地阐明。</p>
+<p>数据竞争定义为在对内存某一位置写入时,同时发生了对同一位置的另一个读取或写入,除非涉及的所有访问都是 sync&#x2F;atomic 包提供的原子数据访问。 如前所述,强烈建议程序员使用适当的同步 以避免数据竞争。 在没有数据竞争的情况下,Go 程序的行为就像所有的 goroutine 被多路复用到单个处理器上。</p>
+<p>虽然程序员应该编写没有数据竞争的 Go 程序,Go 实现在响应数据竞争时可以做什么是有限制的。 实现可能始终通过报告争用和终止程序来响应数据争用。否则,每次读取单个字大小或子字大小的内存位置 必须观察实际写入该位置的值（可能是由并发执行的 goroutine） 并且尚未重写。 这些实现约束使 Go 更像 Java 或 JavaScript, 由于大多数竞争的结果有限, 不像 C 和 C++,其中任何带有竞争的程序的含义 完全未定义,编译器可能做出任何事情。 Go的方法旨在使错误的程序更可靠,更易于调试, 同时仍然坚持认为竞争是错误的,工具可以诊断和报告它们。</p>
+<h2 id="内存模型"><a href="#内存模型" class="headerlink" title="内存模型"></a>内存模型</h2><p>以下 Go 内存模型的正式定义沿袭了 Hans-J. Boehm 和 Sarita V. Adve 发表于 PLDI 2008 的  “Foundations of the C++ Concurrency Memory Model”。data-race-free 程序的定义和race-free程序顺序一致性的保证与他们的这一作品中相同。</p>
+<p>内存模型描述了程序执行的要求, 程序执行由 goroutine 执行组成, goroutine 执行又由内存操作组成。</p>
+<p>内存操作由四个细节建模：</p>
+<ul>
+<li>它的种类,表明它是普通数据读取,还是普通数据写入,或同步操作,例如原子数据访问, 互斥操作或通道操作,</li>
+<li>它在程序中的位置,</li>
+<li>正在访问的内存位置或变量,以及</li>
+<li>该操作读取或写入的值。<br>某些内存操作是类似读取的，包括读取、原子读取、互斥锁和通道接收。 其他内存操作类似写入，包括写入、原子写入、互斥解锁、通道发送和通道关闭。 有些，例如原子比较和交换，既是类似读的，也是类似写的。</li>
+</ul>
+<p>goroutine执行被建模为由单个goroutine执行的一组内存操作。</p>
+<p><strong>要求 1</strong>： 每个goroutine中的内存操作必须对应于该goroutine的正确顺序执行，给定从内存中读出和写入的值。该执行必须符合先序关系，定义为Go语言规范为Go的控制流结构所规定的部分顺序要求，以及表达式的评估顺序。</p>
+<p><strong>要求2</strong>：对于一个给定的程序执行，映射W，当限于同步操作时，必须可以用一些隐含的同步操作的总顺序来解释，该顺序与排序和这些操作所读写的值一致。</p>
+<p>如果一个同步的读类存储器操作r观察到一个同步的写类存储器操作w（也就是说，如果W(r)&#x3D;w），那么w就同步于r。</p>
+<p>发生在前的关系被定义为顺序在前和同步在前关系的联合的反式闭合。</p>
+<p><strong>要求3</strong>：对于一个内存位置x上的普通（非同步）数据读r，W(r)必须是一个对r可见的写w，其中可见意味着以下两个条件都成立。</p>
+<ol>
+<li>w发生在r之前。</li>
+<li>w不会发生在r之前发生的任何其他写w’（对x）之前。</li>
+</ol>
+<p>内存位置x上的读写数据竞争由x上的读类内存操作r和x上的写类内存操作w组成，其中至少有一个是非同步的，这两个操作在发生之前是无序的（也就是说，r发生在w之前，w也没有发生在r之前）。</p>
+<p>内存位置x上的写-写数据竞争由x上的两个类似写的内存操作w和w’组成，其中至少有一个是不同步的，它们在发生之前是无序的。</p>
+<p>请注意，如果内存位置x上没有读写或写数据竞争，那么x上的任何读r只有一个可能的W(r)：在发生之前的顺序中紧接在它之前的单一w。</p>
+<p>更一般地说，可以证明任何Go程序是 data-race-free的，也就是说，它没有存在读写数据竞争的程序执行，其结果只能由一些顺序一致的goroutine执行交错来解释。(证明方法与上文引用的Boehm和Adve的论文第7节相同。)这个属性被称为DRF-SC。</p>
+<p>正式定义的意图是与其他语言（包括C、C++、Java、JavaScript、Rust和Swift）为race-free程序提供的DRF-SC保证相匹配。</p>
+<p>Go语言的某些操作，如goroutine创建和内存分配，都是同步操作。这些操作对synchronized-before部分顺序的影响在下面的 “同步”部分有记录。各个包负责为自己的操作提供类似的文档。</p>
+<h2 id="包含数据竞争的程序的实现限制"><a href="#包含数据竞争的程序的实现限制" class="headerlink" title="包含数据竞争的程序的实现限制"></a>包含数据竞争的程序的实现限制</h2><p>上一节给出了data-race-free程序执行的正式定义。本节非正式地描述了实现必须为包含竞争的程序提供的语义。</p>
+<p>首先，任何实现都可以在检测到数据竞争时，报告该竞争并停止程序的执行。使用ThreadSanitizer（通过 “go build -race “访问）的实现正是这样做的。</p>
+<p>否则，对不大于一个机器字的内存位置x的读取必须观察到一些写w，使得r在w之前不会发生，并且没有写w’，使得w在w’之前发生，w’在r之前发生。</p>
+<p>此外，不允许观察无因的和 “凭空 “的写入。</p>
+<p>大于一个机器字的内存位置的读取被鼓励，但不需要满足与字大小的内存位置相同的语义，观察一个允许的写w。由于性能的原因，实现可以将更大的操作作为一组单独的机器字大小的操作，以一个未指定的顺序。这意味着多字数据结构上的竞争可能导致不一致的值，而不是对应于单一的写。当这些值依赖于内部（指针、长度）或（指针、类型）对的一致性时，如大多数Go实现中的接口值、map、切片和字符串，这种竞争又会导致任意的内存损坏。</p>
+<p>下面的 “不正确的同步 “部分给出了不正确的同步的例子。</p>
+<p>对实现的限制的例子在下面的 “不正确的编译”一节中给出。</p>
+<h2 id="同步"><a href="#同步" class="headerlink" title="同步"></a>同步</h2><h3 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h3><p>程序初始化在一个goroutine中运行，但这个goroutine可以创建其他goroutine，这些goroutine同时运行。</p>
+<p>如果一个包p导入了包q，那么q的init函数的完成会在p的任何一个函数开始之前发生。</p>
+<p>所有init函数的完成在函数main.main开始之前是同步的。</p>
+<h3 id="创建Goroutine"><a href="#创建Goroutine" class="headerlink" title="创建Goroutine"></a>创建Goroutine</h3><p>启动一个新的goroutine的go语句在goroutine的执行开始之前就已经同步了。</p>
+<p>例如，在这个程序中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">var a string</span><br><span class="line"></span><br><span class="line">func f() &#123;</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func hello() &#123;</span><br><span class="line">	a = &quot;hello, world&quot;</span><br><span class="line">	go f()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>调用hello方法会在未来某个时间打印“hello world”（可能是在hello方法返回）。</p>
+<h3 id="销毁Goroutine"><a href="#销毁Goroutine" class="headerlink" title="销毁Goroutine"></a>销毁Goroutine</h3><p>一个goroutine的退出并不保证在程序中的任何事件之前同步进行。例如，在这个程序中。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">var a string</span><br><span class="line"></span><br><span class="line">func hello() &#123;</span><br><span class="line">	go func() &#123; a = &quot;hello&quot; &#125;()</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>对a的赋值后面没有任何同步事件，所以它不能保证被其他goroutine观察到。事实上，一个积极的编译器可能会删除整个go语句。</p>
+<p>如果一个goroutine的效果必须被另一个goroutine观察到，请使用同步机制，如锁或通道通信来建立一个相对顺序。</p>
+<h3 id="通道通信"><a href="#通道通信" class="headerlink" title="通道通信"></a>通道通信</h3><p>通道通信是goroutine之间同步的主要方法。在一个特定通道上的每一个发送都与来自该通道的相应接收相匹配，通常是在一个不同的goroutine中。</p>
+<p>在一个通道上的发送是在该通道的相应接收完成之前同步的。</p>
+<p>这个程序:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">var c = make(chan int, 10)</span><br><span class="line">var a string</span><br><span class="line"></span><br><span class="line">func f() &#123;</span><br><span class="line">	a = &quot;hello, world&quot;</span><br><span class="line">	c &lt;- 0</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	go f()</span><br><span class="line">	&lt;-c</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>保证打印 “hello, world”。对a的写排在了c的发送之前，c的发送在相应的接收完成之前进行同步，接收排在了打印之前。</p>
+<p>关闭一个通道是在接收之前同步进行的，因为该通道已经关闭，所以返回一个零值。</p>
+<p>在前面的例子中，用close(c)代替c &lt;- 0，可以得到一个具有相同保证行为的程序。</p>
+<p>从一个无缓冲通道的接收在该通道的相应发送完成之前被同步。</p>
+<p>这个程序（同上，但发送和接收语句互换，并使用一个无缓冲的通道）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">var c = make(chan int)</span><br><span class="line">var a string</span><br><span class="line"></span><br><span class="line">func f() &#123;</span><br><span class="line">	a = &quot;hello, world&quot;</span><br><span class="line">	&lt;-c</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	go f()</span><br><span class="line">	c &lt;- 0</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>也保证了打印 “hello, world”。对a的写排在了c的发送之前，c的接收在相应的发送完成之前进行同步，而发送则排在了打印之前。</p>
+<p>如果通道是缓冲的（例如，c &#x3D; make(chan int, 1)），那么程序将不能保证打印 “hello, world”。(它可能会打印出空字符串，崩溃，或做其他事情）。</p>
+<p>在一个容量为C的通道上的第k个接收是在该通道的第k+C个发送完成之前同步进行的。</p>
+<p>这条规则将前面的规则概括为缓冲通道的规则。它允许用缓冲信道来模拟计数信号：信道中的项目数对应于有效使用的数量，信道的容量对应于同时使用的最大数量，发送一个项目会获得信号，而接收一个项目会释放信号。这是一个限制并发性的常见用法。</p>
+<p>这个程序为工作列表中的每一个条目都启动了一个goroutine，但是这些goroutine使用限制通道进行协调，以确保一次最多有三个工作函数在运行。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">var limit = make(chan int, 3)</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	for _, w := range work &#123;</span><br><span class="line">		go func(w func()) &#123;</span><br><span class="line">			limit &lt;- 1</span><br><span class="line">			w()</span><br><span class="line">			&lt;-limit</span><br><span class="line">		&#125;(w)</span><br><span class="line">	&#125;</span><br><span class="line">	select&#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="锁"><a href="#锁" class="headerlink" title="锁"></a>锁</h3><p>sync包实现了两种锁的数据类型， sync.Mutex 和 sync.RWMutex.</p>
+<p>对任何sync.Mutex 或 sync.RWMutex 变量 l 来说， n &lt; m 时 ,在调用m次l.Lock() 返回前调用n次l.Unlock()总是同步的。</p>
+<p>这个程序：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">var l sync.Mutex</span><br><span class="line">var a string</span><br><span class="line"></span><br><span class="line">func f() &#123;</span><br><span class="line">	a = &quot;hello, world&quot;</span><br><span class="line">	l.Unlock()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	l.Lock()</span><br><span class="line">	go f()</span><br><span class="line">	l.Lock()</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>保证了打印 “hello, world”。对l.Unlock()的第一次调用（在f中）在对l.Lock()的第二次调用（在main中）返回之前是同步的，这是在打印之前的排序。</p>
+<p>对于任何对sync.RWMutex变量l的调用l.RLock，有一个n，使得对l.Unlock的第n次调用在l.RLock的返回之前被同步，而对l.RUnlock的匹配调用在对l.Lock的调用n+1返回之前被同步。</p>
+<p>对l.TryLock（或l.TryRLock）的成功调用等同于对l.Lock（或l.RLock）的调用。一个不成功的调用完全没有同步的效果。就内存模型而言，l.TryLock（或l.TryRLock）可以被认为是能够返回false的，即使是在互斥区l被解锁的情况下。</p>
+<h3 id="Once"><a href="#Once" class="headerlink" title="Once"></a>Once</h3><p>Sync包通过使用Once类型为存在多个goroutines的情况下的初始化提供了一种安全机制。多个线程可以为一个特定的f执行once.Do(f)，但只有一个线程会运行f()，其他调用会阻塞，直到f()返回。</p>
+<p>从once.Do(f)中调用一次f()的完成是在任何调用once.Do(f)的返回之前同步进行的。</p>
+<p>在这个程序中:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">var a string</span><br><span class="line">var once sync.Once</span><br><span class="line"></span><br><span class="line">func setup() &#123;</span><br><span class="line">	a = &quot;hello, world&quot;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func doprint() &#123;</span><br><span class="line">	once.Do(setup)</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func twoprint() &#123;</span><br><span class="line">	go doprint()</span><br><span class="line">	go doprint()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>调用twoprint将精确地调用setup一次。setup函数将在调用print之前完成。结果是，”hello, world “将被打印两次。</p>
+<h3 id="原子值"><a href="#原子值" class="headerlink" title="原子值"></a>原子值</h3><p>sync&#x2F;atomic包中的API统称为 “原子操作”，可用于同步不同goroutines的执行。如果一个原子操作A的效果被原子操作B观察到，那么A就会在B之前被同步。一个程序中执行的所有原子操作的行为就像以某种顺序一致的方式执行。</p>
+<p>前面的定义与C++的顺序一致的原子操作和Java的volatile变量的语义相同。</p>
+<h3 id="终结器"><a href="#终结器" class="headerlink" title="终结器"></a>终结器</h3><p>runtime包提供了一个SetFinalizer函数，该函数添加了一个终结器，当程序不再能到达某个特定对象时，就会调用这个终结器。对SetFinalizer(x, f)的调用在最终化调用f(x)之前是同步的。</p>
+<h3 id="额外机制"><a href="#额外机制" class="headerlink" title="额外机制"></a>额外机制</h3><p>sync包提供了额外的同步抽象，包括条件变量、无锁映射、分配池和等待组。每个包的文档都说明了它对同步的保证。</p>
+<p>其他提供同步抽象的包也应该在文档中记录它们的保证。</p>
+<h2 id="不正确的同步"><a href="#不正确的同步" class="headerlink" title="不正确的同步"></a>不正确的同步</h2><p>有竞争的程序是不正确的，可以表现出非顺序一致的执行。特别是要注意的是，一个读r可能会观察到与r同时执行的任何写w所写的值。即使发生这种情况，也不意味着在r之后发生的读会观察到w之前发生的写。</p>
+<p>在这个程序中：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">var a, b int</span><br><span class="line"></span><br><span class="line">func f() &#123;</span><br><span class="line">	a = 1</span><br><span class="line">	b = 2</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func g() &#123;</span><br><span class="line">	print(b)</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	go f()</span><br><span class="line">	g()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>有可能发生g打印出2，然后又打印出0。</p>
+<p>这一事实使一些常见的用法失效了。</p>
+<p>双重检查锁是为了避免同步化的开销。例如，twoprint程序可能被错误地写成：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">var a string</span><br><span class="line">var done bool</span><br><span class="line"></span><br><span class="line">func setup() &#123;</span><br><span class="line">	a = &quot;hello, world&quot;</span><br><span class="line">	done = true</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func doprint() &#123;</span><br><span class="line">	if !done &#123;</span><br><span class="line">		once.Do(setup)</span><br><span class="line">	&#125;</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func twoprint() &#123;</span><br><span class="line">	go doprint()</span><br><span class="line">	go doprint()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>但不能保证在doprint中，观察到对done的写意味着观察到对a的写。这个版本可以（不正确地）打印一个空字符串，而不是 “hello, world”。</p>
+<p>另一个不正确的常见用法是忙于等待一个值，如：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">var a string</span><br><span class="line">var done bool</span><br><span class="line"></span><br><span class="line">func setup() &#123;</span><br><span class="line">	a = &quot;hello, world&quot;</span><br><span class="line">	done = true</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	go setup()</span><br><span class="line">	for !done &#123;</span><br><span class="line">	&#125;</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>如前所述，在main中，不能保证观察到写给done的内容就意味着观察到写给a的内容，所以这个程序也可以打印一个空字符串。更糟糕的是，由于两个线程之间没有同步事件，所以无法保证写给done的数据会被main观察到。main中的循环不能保证完成。</p>
+<p>在这个主题上还有一些更微妙的变体，比如这个程序：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">type T struct &#123;</span><br><span class="line">	msg string</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">var g *T</span><br><span class="line"></span><br><span class="line">func setup() &#123;</span><br><span class="line">	t := new(T)</span><br><span class="line">	t.msg = &quot;hello, world&quot;</span><br><span class="line">	g = t</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	go setup()</span><br><span class="line">	for g == nil &#123;</span><br><span class="line">	&#125;</span><br><span class="line">	print(g.msg)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>即使main观察到g !&#x3D; nil并退出其循环，也不能保证它能观察到g.msg的初始化值。</p>
+<p>在所有这些例子中，解决方案都是一样的：使用显式同步。</p>
+<h2 id="不正确的编译"><a href="#不正确的编译" class="headerlink" title="不正确的编译"></a>不正确的编译</h2><p>Go的内存模型对编译器优化的限制和对Go程序的限制一样多。一些在单线程程序中有效的编译器优化在所有Go程序中都是无效的。特别是，编译器不能引入原程序中不存在的写，不能允许一个读来观察多个值，也不能允许一个写来写多个值。</p>
+<p>下面所有的例子都假设<code>*p</code>和<code>*q</code>指的是多个goroutine可以访问的内存位置。</p>
+<p>不在race-free程序中引入数据竞争意味着不将写操作从条件语句中移出，因为它们出现在条件语句中。例如，编译器不能在这个程序中倒置条件。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">*p = 1</span><br><span class="line">if cond &#123;</span><br><span class="line">	*p = 2</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>也就是说， 编译器不得将该程序改写成这个程序：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">*p = 2</span><br><span class="line">if !cond &#123;</span><br><span class="line">	*p = 1</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>如果cond值为false，另一个goroutine正在读取<em>p，那么在原来的程序中，另一个goroutine只能观察到</em>p的任何先前值和1。</p>
+<p>不引入数据竞争也意味着不假定循环会终止。例如，一般来说，编译器不能把对<em>p或</em>q的访问移到这个程序中的循环前面：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">n := 0</span><br><span class="line">for e := list; e != nil; e = e.next &#123;</span><br><span class="line">	n++</span><br><span class="line">&#125;</span><br><span class="line">i := *p</span><br><span class="line">*q = 1</span><br></pre></td></tr></table></figure>
+<p>如果list指向一个循环列表，那么原程序永远不会访问<em>p或</em>q，但重写的程序会。(如果编译器能证明<code>*p</code>不会恐慌，那么将<code>*q</code>提前是安全的；将<code>*q</code>提前也需要编译器证明没有其他goroutine可以访问<code>*q</code>)。</p>
+<p>不引入数据竞争也意味着不假设被调用的函数总是返回或没有同步操作。例如，编译器不能在这个程序中把对<em>p或</em>q的访问移到函数调用之前（至少在不直接了解f的精确行为的情况下不能这样做）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">f()</span><br><span class="line">i := *p</span><br><span class="line">*q = 1</span><br></pre></td></tr></table></figure>
+<p>如果该调用从未返回，那么原程序将再次无法访问<em>p或</em>q，但重写的程序可以。而如果调用包含同步操作，那么原程序可以在访问<em>p和</em>q之前的边上建立发生，但重写的程序不会。</p>
+<p>不允许一次读取观察多个值意味着不允许从共享内存中重新加载局部变量。例如，在这个程序中，编译器不能丢弃i并第二次从*p重新加载它：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">i := *p</span><br><span class="line">if i &lt; 0 || i &gt;= len(funcs) &#123;</span><br><span class="line">	panic(&quot;invalid function index&quot;)</span><br><span class="line">&#125;</span><br><span class="line">... complex code ...</span><br><span class="line">// compiler must NOT reload i = *p here</span><br><span class="line">funcs[i]()</span><br></pre></td></tr></table></figure>
+<p>如果复杂的代码需要很多寄存器，单线程程序的编译器可以丢弃i而不保存副本，然后在funcs[i]()之前重新加载i &#x3D; <em>p。Go编译器则不能这样做，因为</em>p的值可能已经改变。(相反，编译器可以将i溢出到堆栈中）。</p>
+<p>不允许一次写入多个值也意味着在写入前不使用将写入局部变量的内存作为临时存储。例如，在这个程序中，编译器不得使用*p作为临时存储。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">*p = i + *p/2</span><br></pre></td></tr></table></figure>
+<p>也就是说， 编译器不得将该程序改写成这个程序：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">*p /= 2</span><br><span class="line">*p += i</span><br></pre></td></tr></table></figure>
+<p>如果i和<em>p开始等于2，原代码做</em>p&#x3D;3，所以一个竞赛线程只能从<em>p中读取2或3。重写的代码先做</em>p&#x3D;1，然后再做*p&#x3D;3，这样一个竞赛线程也可以读到1。</p>
+<p>请注意，所有这些优化在C&#x2F;C++编译器中都是允许的：与C&#x2F;C++编译器共享后端的Go编译器必须注意禁用那些对Go无效的优化。</p>
+<p>请注意，如果编译器能够证明数据竞争不会影响目标平台上的正确执行，那么禁止引入数据竞争的规定就不适用。例如，在基本上所有的CPU上，改写以下内容是有效的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">n := 0</span><br><span class="line">for i := 0; i &lt; m; i++ &#123;</span><br><span class="line">	n += *shared</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>改写成：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">n := 0</span><br><span class="line">local := *shared</span><br><span class="line">for i := 0; i &lt; m; i++ &#123;</span><br><span class="line">	n += local</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>只要能证明*shared在访问时不会出错，因为可能增加的读不会影响任何现有的并发读或写。另一方面，这种重写在源到源的翻译器中是无效的。</p>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>编写data-race-free的Go程序员可以依赖这些程序的顺序一致的执行，就像在基本上所有其他现代编程语言中一样。</p>
+<p>当涉及到有竞争的程序时，程序员和编译器都应该记住一个建议：不要耍小聪明。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://tinykopano.github.io/2022/10/31/The-GO-Memory-Model/" data-id="clfow1dd30005gjoqb7q7gto9" data-title="The Go Memory Model" class="article-share-link">Share</a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/go/" rel="tag">go</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/programming-language/" rel="tag">programming language</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          In Search of an Understandable Consensus Algorithm (Extended Version)
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">The Design for a Practical System for Fault-Tolerant Virtual Machines</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/">Course</a><ul class="category-list-child"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Document/">Document</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Paper/">Paper</a></li></ul></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Raft/" rel="tag">Raft</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/big-data/" rel="tag">big data</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/consensus-algorithm/" rel="tag">consensus algorithm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/go/" rel="tag">go</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/programming-language/" rel="tag">programming language</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtual-machine/" rel="tag">virtual machine</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/zookeeper/" rel="tag">zookeeper</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Raft/" style="font-size: 10px;">Raft</a> <a href="/tags/big-data/" style="font-size: 15px;">big data</a> <a href="/tags/consensus-algorithm/" style="font-size: 10px;">consensus algorithm</a> <a href="/tags/distributed-system/" style="font-size: 20px;">distributed system</a> <a href="/tags/go/" style="font-size: 10px;">go</a> <a href="/tags/programming-language/" style="font-size: 10px;">programming language</a> <a href="/tags/virtual-machine/" style="font-size: 10px;">virtual machine</a> <a href="/tags/zookeeper/" style="font-size: 10px;">zookeeper</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">January 2023</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">December 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/11/">November 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">October 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">September 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">August 2022</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2022/12/31/ZooKeeper-Wait-free-coordination-for-Internet-scale-systems/">ZooKeeper: Wait-free coordination for Internet-scale systems</a>
+          </li>
+        
+          <li>
+            <a href="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/">In Search of an Understandable Consensus Algorithm (Extended Version)</a>
+          </li>
+        
+          <li>
+            <a href="/2022/10/31/The-GO-Memory-Model/">The Go Memory Model</a>
+          </li>
+        
+          <li>
+            <a href="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/">The Design for a Practical System for Fault-Tolerant Virtual Machines</a>
+          </li>
+        
+          <li>
+            <a href="/2022/08/31/The-Google-File-System/">The Google File System</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2023 KoPaNo<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.4.1.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>

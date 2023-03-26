@@ -23,7 +23,7 @@
 <meta property="og:image" content="https://tinykopano.github.io/2022/08/31/The-Google-File-System/table05.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/08/31/The-Google-File-System/table06.JPG">
 <meta property="article:published_time" content="2022-08-31T22:10:00.000Z">
-<meta property="article:modified_time" content="2023-03-26T03:45:20.054Z">
+<meta property="article:modified_time" content="2023-03-26T04:16:16.794Z">
 <meta property="article:author" content="KoPaNo">
 <meta property="article:tag" content="distributed system">
 <meta property="article:tag" content="big data">
@@ -115,6 +115,8 @@
 <p>GFS的设计来自于我们对我们的应用负载与技术环境的观察。虽然GFS与过去的分布式文件系统有着共同的目标，但是根据我们的观察，我们的应用负载和技术环境与过去的分布式系统所做的假设有明显的不同。这让我们重新审视了传统的选择并去探索完全不同的设计。</p>
 <p>GFS很好地满足了我们的存储需求。GFS在Google被广泛地作为存储平台部署，用于生成、处理我们服务所使用的数据或用于需要大规模数据集的研发工作。到目前为止，最大的GFS集群有上千台机器、上千块磁盘，并提供了上百TB的存储能力。</p>
 <p>在本文中，我们介绍了为支持分布式应用程序而设计的文件系统接口的扩展，还从多方面讨论了我们的设计，并给出了微型基准测试与在现实场景中的使用表现。</p>
+<span id="more"></span>
+
 <h2 id="一、-引言"><a href="#一、-引言" class="headerlink" title="一、   引言"></a>一、   引言</h2><p>为了满足Google快速增长的数据处理需求，我们设计并实现了GFS。GFS与过去的分布式系统有着很多相同的目标，如性能、可伸缩性、可靠性和可用性。但是我们的设计来自于我们对我们的应用负载与技术环境的观察。这些观察反映了与过去的分布式系统所做的假设明显不同的结果。因此，我们重新审视的传统的选择并探索了完全不同的设计。</p>
 <p>首先，我们认为设备故障经常发生。GFS由成百上千台由廉价设备组成的存储节点组成，并被与其数量相当的客户端访问。设备的数量和质量决定了几乎在任何时间都会有部分设备无法正常工作，甚至部分设备无法从当前故障中分恢复。我们遇到过的问题包括：应用程序bug、操作系统bug、人为错误和硬盘、内存、插头、网络、电源等设备故障。因此，系统必须具有持续监控、错误检测、容错与自动恢复的能力。</p>
 <p>第二，文件比传统标准更大。数GB大小的文件是十分常见的。每个文件一般包含很多引用程序使用的对象，如Web文档等。因为我们的数据集由数十亿个总计数TB的对象组成，且这个数字还在快速增长，所以管理数十亿个几KB大小的文件是非常不明智的，即使操作系统支持这种操作。因此，我们需要重新考虑像I&#x2F;O操作和chunk大小等设计和参数。</p>
@@ -314,7 +316,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2022/08/31/The-Google-File-System/" data-id="clfouxkvm0001i6oxhg9e9n5n" data-title="The Google File System" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/08/31/The-Google-File-System/" data-id="clfow1dd40006gjoq0unj71wo" data-title="The Google File System" class="article-share-link">Share</a>
       
       
       
@@ -355,7 +357,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Categories</h3>
     <div class="widget">
-      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/">Course</a><ul class="category-list-child"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Paper/">Paper</a></li></ul></li></ul>
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/">Course</a><ul class="category-list-child"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Document/">Document</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Paper/">Paper</a></li></ul></li></ul>
     </div>
   </div>
 
@@ -365,7 +367,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/big-data/" rel="tag">big data</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtual-machine/" rel="tag">virtual machine</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Raft/" rel="tag">Raft</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/big-data/" rel="tag">big data</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/consensus-algorithm/" rel="tag">consensus algorithm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/go/" rel="tag">go</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/programming-language/" rel="tag">programming language</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtual-machine/" rel="tag">virtual machine</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/zookeeper/" rel="tag">zookeeper</a></li></ul>
     </div>
   </div>
 
@@ -375,7 +377,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/big-data/" style="font-size: 15px;">big data</a> <a href="/tags/distributed-system/" style="font-size: 20px;">distributed system</a> <a href="/tags/virtual-machine/" style="font-size: 10px;">virtual machine</a>
+      <a href="/tags/Raft/" style="font-size: 10px;">Raft</a> <a href="/tags/big-data/" style="font-size: 15px;">big data</a> <a href="/tags/consensus-algorithm/" style="font-size: 10px;">consensus algorithm</a> <a href="/tags/distributed-system/" style="font-size: 20px;">distributed system</a> <a href="/tags/go/" style="font-size: 10px;">go</a> <a href="/tags/programming-language/" style="font-size: 10px;">programming language</a> <a href="/tags/virtual-machine/" style="font-size: 10px;">virtual machine</a> <a href="/tags/zookeeper/" style="font-size: 10px;">zookeeper</a>
     </div>
   </div>
 
@@ -384,7 +386,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Archives</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">October 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">September 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">August 2022</a></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">January 2023</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">December 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/11/">November 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">October 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">September 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">August 2022</a></li></ul>
     </div>
   </div>
 
@@ -397,15 +399,23 @@
       <ul>
         
           <li>
+            <a href="/2022/12/31/ZooKeeper-Wait-free-coordination-for-Internet-scale-systems/">ZooKeeper: Wait-free coordination for Internet-scale systems</a>
+          </li>
+        
+          <li>
+            <a href="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/">In Search of an Understandable Consensus Algorithm (Extended Version)</a>
+          </li>
+        
+          <li>
+            <a href="/2022/10/31/The-GO-Memory-Model/">The Go Memory Model</a>
+          </li>
+        
+          <li>
             <a href="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/">The Design for a Practical System for Fault-Tolerant Virtual Machines</a>
           </li>
         
           <li>
             <a href="/2022/08/31/The-Google-File-System/">The Google File System</a>
-          </li>
-        
-          <li>
-            <a href="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/">MapReduce: Simplified Data Processing on Large Clusters</a>
           </li>
         
       </ul>
