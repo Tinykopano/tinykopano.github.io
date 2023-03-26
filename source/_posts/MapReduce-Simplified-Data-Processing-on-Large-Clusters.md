@@ -2,6 +2,7 @@
 title: 'MapReduce: Simplified Data Processing on Large Clusters'
 date: 2022-08-01 10:10:00
 tags: [distributed system,big data]
+categories: [Course,Paper]
 ---
 
 # MapReduce: 大型集群上的简化数据处理
@@ -13,6 +14,8 @@ MapReduce是一个设计模型，也是一个处理和产生海量数据的一�
 使用这个功能形式实现的程序能够在大量的普通机器上并行执行。这个运行程序的系统关心下面的这些细节：输入数据的分区、一组机器上调度程序执行、处理机器失败问题，以及管理所需的机器内部的通信。这使没有任何并行处理和分布式系统经验的程序员能够利用这个大型分布式系统的资源。
 
 我们的MapReduce实现运行在一个由普通机器组成的大规模集群上，具有很高的可扩展性：一个典型的MapReduce计算会在几千台机器上处理许多TB的数据。程序员们发现这个系统很容易使用：目前已经实现了几百个MapReduce程序，在Google的集群上，每天有超过一千个的MapReduce工作在运行。
+
+<!-- more -->
 
 ## 一、  引言
 
@@ -104,7 +107,6 @@ MapReduce接口有很多不同的实现，需要根据环境来做出合适的�
 
 通过自动的将输入数据分区成M个分片，Map调用被分配到多台机器上运行。数据的分片能够在不同的机器上并行处理。使用分区函数（如，hash(key) mod R）将中间结果的key进行分区成R个分片，Reduce调用也被分配到多台机器上运行。分区的数量（R）和分区函数是由用户指定的。
 
-![执行概述](/assets/img/posts/20220801/figure01.JPG "执行概述")
 ![执行概述](figure01.JPG "执行概述")
 
 <div style="text-align: center;"><b>图1</b>：执行概述</div>
