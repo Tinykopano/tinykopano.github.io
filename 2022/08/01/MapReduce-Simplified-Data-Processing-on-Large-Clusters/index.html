@@ -4,17 +4,27 @@
   <meta charset="utf-8">
   
   
-  <title>KoPaNo&#39;s Blog</title>
+  <title>MapReduce: Simplified Data Processing on Large Clusters | KoPaNo&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="This is my Odyssey">
-<meta property="og:type" content="website">
-<meta property="og:title" content="KoPaNo&#39;s Blog">
-<meta property="og:url" content="https://tinykopano.github.io/index.html">
+  <meta name="description" content="MapReduce: 大型集群上的简化数据处理摘要MapReduce是一个设计模型，也是一个处理和产生海量数据的一个相关实现。用户指定一个用于处理一个键值（key-value）对生成一组key&#x2F;value对形式的中间结果的map函数，以及一个将中间结果键相同的键值对合并到一起的reduce函数。许多现实世界的任务都能满足这个模型，如这篇文章所示。 使用这个功能形式实现的程序能够在大量的普">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapReduce: Simplified Data Processing on Large Clusters">
+<meta property="og:url" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/index.html">
 <meta property="og:site_name" content="KoPaNo&#39;s Blog">
-<meta property="og:description" content="This is my Odyssey">
+<meta property="og:description" content="MapReduce: 大型集群上的简化数据处理摘要MapReduce是一个设计模型，也是一个处理和产生海量数据的一个相关实现。用户指定一个用于处理一个键值（key-value）对生成一组key&#x2F;value对形式的中间结果的map函数，以及一个将中间结果键相同的键值对合并到一起的reduce函数。许多现实世界的任务都能满足这个模型，如这篇文章所示。 使用这个功能形式实现的程序能够在大量的普">
 <meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure01.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure02.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure03.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure04.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/table01.JPG">
+<meta property="article:published_time" content="2022-08-01T10:10:00.000Z">
+<meta property="article:modified_time" content="2023-03-26T02:51:07.897Z">
 <meta property="article:author" content="KoPaNo">
+<meta property="article:tag" content="distributed system">
+<meta property="article:tag" content="big data">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure01.JPG">
   
     <link rel="alternate" href="/atom.xml" title="KoPaNo's Blog" type="application/atom+xml">
   
@@ -71,60 +81,7 @@
 </header>
 
       <div class="outer">
-        <section id="main">
-  
-    <article id="post-hello-world" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2023/03/26/hello-world/" class="article-date">
-  <time class="dt-published" datetime="2023-03-26T02:51:07.897Z" itemprop="datePublished">2023-03-26</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2023/03/26/hello-world/">Hello World</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2023/03/26/hello-world/" data-id="clfoszx9i0001h3oq62vp1inm" data-title="Hello World" class="article-share-link">Share</a>
-      
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-    <article id="post-MapReduce-Simplified-Data-Processing-on-Large-Clusters" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+        <section id="main"><article id="post-MapReduce-Simplified-Data-Processing-on-Large-Clusters" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/" class="article-date">
   <time class="dt-published" datetime="2022-08-01T10:10:00.000Z" itemprop="datePublished">2022-08-01</time>
@@ -137,8 +94,8 @@
       <header class="article-header">
         
   
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/">MapReduce: Simplified Data Processing on Large Clusters</a>
+    <h1 class="p-name article-title" itemprop="headline name">
+      MapReduce: Simplified Data Processing on Large Clusters
     </h1>
   
 
@@ -314,11 +271,23 @@
     </footer>
   </div>
   
-</article>
-
-
+    
+<nav id="article-nav">
+  
+    <a href="/2023/03/26/hello-world/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          Hello World
+        
+      </div>
+    </a>
+  
+  
+</nav>
 
   
+</article>
 
 
 </section>
