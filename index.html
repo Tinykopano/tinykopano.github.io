@@ -73,12 +73,16 @@
       <div class="outer">
         <section id="main">
   
-    <article id="post-The-Google-File-System" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+    <article id="post-The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
-    <a href="/2023/03/26/The-Google-File-System/" class="article-date">
-  <time class="dt-published" datetime="2023-03-26T10:57:25.000Z" itemprop="datePublished">2023-03-26</time>
+    <a href="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/" class="article-date">
+  <time class="dt-published" datetime="2022-09-30T22:22:00.000Z" itemprop="datePublished">2022-10-01</time>
 </a>
     
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Course/">Course</a>►<a class="article-category-link" href="/categories/Course/Paper/">Paper</a>
+  </div>
+
   </div>
   <div class="article-inner">
     
@@ -87,7 +91,7 @@
         
   
     <h1 itemprop="name">
-      <a class="p-name article-title" href="/2023/03/26/The-Google-File-System/">The Google File System</a>
+      <a class="p-name article-title" href="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/">The Design for a Practical System for Fault-Tolerant Virtual Machines</a>
     </h1>
   
 
@@ -95,14 +99,119 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        
+        <h1 id="一种实用的容错虚拟机系统的设计"><a href="#一种实用的容错虚拟机系统的设计" class="headerlink" title="一种实用的容错虚拟机系统的设计"></a>一种实用的容错虚拟机系统的设计</h1><h2 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h2><p>我们通过在另一个服务器上的备份虚拟机复制执行主虚拟机的方法，已经实现了一个支持容错虚拟机的商用企业级系统。我们已经在VMware vSphere 4.0上实现了一个易于使用的完整的系统，这个系统运行在商用服务器上，并且通常会降低实际应用的性能少于10%.我们复制VM执行的方法和Bressoud描述的是相似的，但是我们做了很多重要的设计选择来极大的提高了性能。另外，一个在故障后能自动恢复冗余的易于使用的商用系统需要许多在复制的虚拟机上的额外组件。我们已经设计并实现了这些额外的组件，并且也遇到了一些实际的问题在支持虚拟机运行企业应用的时候。在这篇文章，我们会描述我们的基础设计，并讨论替代的选择和许多实现的细节，也提供了在micro-benchmarks和实际应用上的性能评估。</p>
+<h2 id="一、-引言"><a href="#一、-引言" class="headerlink" title="一、  引言"></a>一、  引言</h2><p>一种常见的实现故障容忍服务器的方法是主备机制，如果主服务器失败，一个备份服务器总是可以进行接管。在任何时间，备份服务器的状态必须和主服务器几乎保持一致，因此当主服务器失败的时候，备份服务器可以立刻接管，此时对于外部客户端而言，故障就相当于被隐藏了起来，并且不会造成数据丢失。在备份服务器上复制状态的一种方法是将主服务器的所有状态，包括CPU、内存、IO设备，连续地送给备份服务器。然而，这种发送状态的方法，尤其是涉及到内存中的变更，其需要的带宽非常大。</p>
+<p>另一种可以用更少带宽复制服务器的方法类似于状态机。这种思路是将服务器建模为确定性的状态机，他们从相同的初始状态开始，并且确保以相同的顺序接收相同的输入请求，这样就能保持同步。因为大多数服务器或服务有一些不确定性的操作，因此必须使用额外的协调机制来确保主备同步。然而，需要保持主备一致性的额外信息数目，远远少于正在变更的主服务器上状态（主要是内存更新）的数目。</p>
+<p>实现协调机制来确保物理服务器的确定性操作是困难的，尤其随着处理器频率增长。反之，一个运行在虚拟机监视器（hypervisor）上的虚拟机，是一个实现状态机方法的很好的平台。一个虚拟机可以被当作一个定义好的状态机，它的操作是机器被虚拟化的操作（包括它所有的设备）。和物理服务器一样，VM有相同的非确定性操作（例如读取时钟或发送中断），因此为了保持同步，额外的信息必须被发送给备份服务器。虚拟机监视器（hypervisor）有虚拟机的全权控制权利，包括处理所有输入，因此它能够获得所有与主虚拟机上的非确定性操作有关的必要信息，并且能正确地重放这些操作。</p>
+<p>因此，这个状态机方法可以通过商业化软件上的虚拟机来实现，它不需要硬件更改，允许在最新的微处理器上立刻实现故障容忍。另外，状态机方法需要的低带宽允许了主备服务器能更好地进行物理分隔。例如，被复制的VM可以运行在横跨一个学校的物理机器上，相比于运行在同一建筑内的虚拟机而言，可以提供更多的可靠性。</p>
+<p>我们在VMware vSphere 4.0平台上使用主备机制实现了故障容忍的虚拟机，这个平台以一种高度有效的方式，运行着完全虚拟化的x86虚拟机。因为VMware vSphere实现了一个完整的x86虚拟机，所以我们自动地能够为任何x86操作系统和应用提供故障容忍。这种允许我们记录一个主服务器执行，并确保备份服务器一致执行的基础技术是确定性重放。VMware vSphere Fault Tolerance(FT)是基于确定性重放（Deterministic Replay）的，但是为了建立一个完整的故障容忍系统，还增加了必要的额外协议和功能。除了提供硬件故障容忍，我们的系统在一次失败后，通过在局部集群中任何可接受的服务器上开始一个新的备份虚拟机，进行自动地存储备份。目前确定性重放和VMare FT的产品版本只支持单处理器的虚拟机。多处理器虚拟机的操作记录和重放还在开发中，因为每个共享内存的操作都是一个非确定性的操作，因此还有重要的性能问题待解决。</p>
+<p>Bressoud和Schneider描述了一个针对HP PA-RISC平台的故障容忍虚拟机的原型实现。我们的方法是相似的，但是出于性能原因，以及在调查了许多可替代设计后，我们已经做了一些基础性的改变。另外，为了建立一个完整的系统，而这个系统是有效的并且能够被正在运行企业级应用的客户使用，我们已经设计并实现了系统中许多额外的组件，可以处理许多实际问题。与大多数其他实际系统讨论的类似，我们只尝试应付fail-stop类型的故障，这是一种服务器故障，可以在故障服务器造成一次不正确的外部可见行为之前被检测。</p>
+<p>文章的剩余部分如下组织。首先，我们描述了我们基础的设计，并且详细说明了我们的基本协议，它能确保在主虚拟机失败后，备份虚拟机能够接替，且不会造成数据丢失。然后，我们描述了许多实际问题的细节，这些问题是为了建立一个健壮的、完整的和自动化系统过程中必须被处理的。我们也描述了几个可用于实现故障容忍虚拟机的设计选择，并且讨论了这些选择的得失。接着，我们给出在一些基准以及实际企业级应用上的性能结果。最后，我们描述相关的工作和结论。</p>
+<h2 id="二、-基础的故障容忍设计"><a href="#二、-基础的故障容忍设计" class="headerlink" title="二、  基础的故障容忍设计"></a>二、  基础的故障容忍设计</h2><p><img src="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/figure01.JPG" alt="基本FT配置" title="基本FT配置"></p>
+<p>图1展示了我们系统在故障容忍VM的基本步骤。对于一个给定的VM，我们希望提供故障容忍（主VM），我们在一个完全不同的物理机器上运行一个备份VM，保持和主VM同步并且执行一致，虽然存在短时间的滞后。我们说这两个VM是虚拟锁步的（virtual lock-step）。VM的虚拟磁盘是在一个共享存储中的（例如一个Fibre Channel或者iSCSI磁盘阵列），因此可以接受主备服务器的输入和输出。（我们将在4.1节中讨论带有分隔的非共享虚拟磁盘的主备VM的设计）只有主VM会说明它在网络中的存在，因此所有网络输入都会来到主VM上。相似地，所有其他输入（例如键盘和鼠标）也只会来到主VM上。</p>
+<p>所有主VM接收到的输入都会通过名为logging channel的网络连接，被发送到备份VM上。对于几个工作负载而言，主要的输入途径是网络和磁盘。为了保证备份VM和主VM使用相同的方式执行非确定性操作，下面2.1节讨论的额外的信息也需要发送。结果备份VM总是执行和主VM一致的操作。然而，备份VM的输出会被管理程序扔掉，因此只有主VM产生实际输出，并被返回给客户端。和2.2节中描述的一样，为了确保主VM失败后没有数据丢失，主备VM遵循一个具体的协议，包括备份VM明确的确认信息。</p>
+<p>为了检测主或备份虚拟机是否失败，我们的系统既使用相关服务器间的心跳机制，同时也监测 logging channel 上的流量。另外，我们我们必须确保只有主或备份VM执行操作，即使存在脑裂（split brain）的场景，在这种场景中主备服务器互相之间会失去通信。</p>
+<p>在下面的小节中，我们在几个重要的方面提供更多的细节。在2.1节中，我们给出一些确定性重放技术的细节，保证主备VM通过 logging channel 上的信息保持一致。在2.2节中，我们描述了我们的FT协议中的一个基础规则，保证了主VM失败后没有数据丢失。在2.3节中，我们描述我们的方法，它能够通过正确的方式检测及响应故障。</p>
+<h3 id="2-1-确定性重放的实现"><a href="#2-1-确定性重放的实现" class="headerlink" title="2.1 确定性重放的实现"></a>2.1 确定性重放的实现</h3><p>正如我们已经提到的，复制服务器（或者VM）的操作可以被建模为确定性状态机的复制。如果两个确定性的状态机以相同的初始状态开始，并且以相同的顺序提供确切的输入，它们将经历相同的状态序列并且产生相同的输出。一个虚拟机有很宽泛的输入，包括到来的网络包，磁盘读，以及来自键盘和鼠标的输入。非确定性事件（例如虚拟中断）和非确定性操作（例如处理器的时钟周期计数器）也会影响虚拟机的状态。这显示了对于正在运行任何操作系统和工作负载的任何虚拟机而言，复制执行有三个挑战：（1）为了保证一个备份虚拟机的确定性执行，正确地得到所有输入以及非确定性执行是必要的。（2）正确地将输入与非确定性执行应用到备份虚拟机上。（3）以一种不会降低性能的方式执行。另外，许多在x86处理器上的复杂操作还未被定义，因此会引起非确定性以及副作用。捕获这些未定义的操作并且重放它们产生相同的状态是一个额外的挑战。</p>
+<p>针对在VMare vSphere平台上的x86虚拟机，VMware确定性地重放恰好提供了这个功能。确定性重放记录了 VM 的输入以及与 VM执行相关的所有可能的不确定性的日志条目流，这些条目会被写入日志文件。在读取日志文件中的条目后，VM 操作会被精确地重放。 对于非确定性操作，为了允许操作以相同的状态变化和输出再现，需要记录足够的信息。 对于非确定性事件，例如定时器或 IO 完成中断，事件发生的确切指令也会被记录下来。 在重放期间，事件被传递在指令流中的同一位置。 VMware 确定性重放采用各种技术，实现了高效的事件记录和事件传递机制，包括使用AMD和英特尔联合开发的硬件性能计数器。</p>
+<p>Bressoud 和 Schneider提到将VM执行切分成不同的时代（epoch），其中非确定性事件，例如中断仅在一个epoch结束时传递。 epoch的概念似乎被用作批处理机制，因为在它发生的确切指令处单独传递每个中断的成本太高。然而，我们的事件传递机制足够高效，以至于 VMware确定性重放不需要使用epochs。 每次中断在发生时被记录，并且在重放时有效地传递到适当的指令处。</p>
+<h3 id="2-2-FT协议"><a href="#2-2-FT协议" class="headerlink" title="2.2 FT协议"></a>2.2 FT协议</h3><p>对于 VMware FT而言，我们使用确定性重放来生成必要的日志条目来记录主VM的执行情况，但是不是将日志条目写入磁盘，而是通过日志通道将它们发送到备份 VM。备份 VM 实时重放日志条目，因此与主 VM 的执行保持一致。 然而，我们必须在日志通道中使用严格的 FT 协议以增强日志条目，从而确保我们实现故障容忍。 我们的基本要求如下：</p>
+<blockquote>
+<p><strong>输出要求</strong>：如果备份VM在主VM发生故障后接管，那么备份VM将继续以一种与主虚拟机发送到外部世界的所有输出完全一致的方式执行。</p>
+</blockquote>
+<p>请注意，在发生故障转移后（即备份 VM 需要在主VM故障后接管），备份VM开始执行的方式可能与主 VM 相当不同，因为在执行期间发生了许多非确定性事件。但是，只要备份VM满足输出要求，在故障转移到备份 VM期间没有外部可见状态或数据的丢失，客户端将注意到他们的服务没有中断或不一致。</p>
+<p>可以通过延迟任何外部输出（通常是网络数据包）直到备份VM收到所有信息允许它至少执行到该输出操作的节点，来保证上述的输出要求。一个必要条件是备份 VM 必须接收到输出操作之前生成的所有日志条目。这些日志条目将允许它执行到最后一个日志条目的点。但是，假设失败是在主VM执行输出操作后立即发生。备份 VM 必须知道它必须继续重播到输出操作点，并且到那时只能“上线”（停止重播并作为主VM接管，如2.3 节所述）。如果备份将在输出操作之前的最后一个日志条目点上线，一些非确定性事件（例如计时器传递给 VM 的中断）可能会在执行输出操作之前改变其执行路径。</p>
+<p>给定上述的限制，强制满足输入要求的最容易的方式是在每个输出操作时创建一个特殊的日志条目。然后，输入要求一定被下面特殊的规则限制：</p>
+<blockquote>
+<p><strong>输出规则</strong>：主VM可能不发送一个输出到外部世界，直到备份VM 已收到并确认与产生输出的操作相关的日志条目。</p>
+</blockquote>
+<p>如果备份 VM 已收到所有日志条目，包括生成输出操作的日志条目，然后备份 VM 将能够准确地重现主 VM在输出点的状态，所以如果主VM死了，备份将正确地达到一个与输出一致的状态。相反，如果备份 VM在没有收到所有必要的日志条目的情况下接管，那么它的状态可能会迅速分歧，以至于与主服务器的输出不一致。输出规则在某些方面类似于 [11] 中描述的方法，其中“外部同步” IO 实际上可以被缓存，只要它在下一次外部通信之前确实被写入磁盘了。</p>
+<p>请注意，输出规则没有说明关于停止主VM执行的任何事。我们只需要延迟输出发送，但 VM 本身可以继续执行。由于操作系统通过异步中断来指示完成，因此可以执行非阻塞的网络和磁盘输出，VM可以轻松地继续执行并且不一定会立即受到输出延迟的影响。相比之下，以前的工作 [3, 9] 通常必须在执行输出之前完全停止主VM，直到备份 VM 已确认来自主 VM 的所有必要信息。</p>
+<p><img src="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/figure02.JPG" alt="FT协议" title="FT协议"></p>
+<p>作为一个例子，我们在图2中展示了 FT 协议的需求。该图显示了一个主VM和备份VM上的事件时间线。从主线到备份线的箭头表示日志条目的传输，从备份线路到主线路的箭头表示确认。有关异步事件、输入和输出操作的信息必须作为日志条目发送到备份VM并确认。如图所示，到外部世界的输出被延迟，直到主VM收到来自备份 VM 的确认，它已经收到与输出操作相关的日志条目。鉴于遵循输出规则，备份VM将能够以这样一种状态接管，即与主VM最后的输出一致。</p>
+<p>我们不能保证一旦出现故障转移情况，所有输出都只产生一次。当主VM打算发送输出时，没有使用两阶段提交事务，备份VM无法确定主VM是在发送它的最后一个输出之前还是之后立即崩溃。 幸运的是，网络基础设施（包括常用的TCP）旨在处理丢失的数据包和相同（重复）的数据包。 请注意传入到主VM的数据包也可能在其故障的期间丢失，因此不会被传递给备份VM。 但是，传入的数据包可能会由于与服务器故障无关的任何原因被丢弃，因此网络基础设施、操作系统和应用程序都被写入，以确保他们可以弥补丢失的数据包。</p>
+<h3 id="2-3-故障检测与响应"><a href="#2-3-故障检测与响应" class="headerlink" title="2.3 故障检测与响应"></a>2.3 故障检测与响应</h3><p>如上所述，如果主备VM中的一个显示已经故障，那么另一个必须快速响应。如果备份VM出现故障，主VM将上线，即离开记录模式（因此停止发送条目到日志通道）并开始正常执行。如果主VM失败，备份VM应该同样上线（go live），但过程更为复杂。由于其执行的滞后，备份 VM 可能会有许多它已收到并确认，但尚未消费的日志条目，因为备份 VM 尚未达到执行的适当点。备份VM必须继续重放日志条目，直到它消费了最后一个日志条目。此时，备份 VM 将停止重放模式并开始作为正常VM执行。本质上备份VM被提升为主VM（现在缺少备份VM）。由于它不再是备份 VM，当操作系统执行输出操作时，新的主VM现在将向外部世界生产输出。在过渡到正常模式期间，可能会有一些特定设备的操作需要允许正确地发送输出。特别是，出于联网目的，VMware FT 自动在网络上通告新的主VM的MAC 地址，以便物理网络交换机知道新的主 VM 所在的服务器。此外，新提升的主VM可能需要重做一些磁盘 IO（如第 3.4 节所述）。</p>
+<p>有许多可能的方法来尝试检测主备VM的故障。VMware FT在运行容错VMs的服务器之间使用UDP心跳，来检测服务器何时崩溃。此外，VMware FT 监控日志流量，包括从主到备的发送以及从备到主的确认。因为定时器中断，日志流量应该是有规律的，并且永远不会停止。因此，在日志条目或确认流中的中断可能表明VM故障。如果心跳或记录流量已停止超过特定超时时间（大约几秒钟），就可能发生故障了。</p>
+<p>但是，任何此类故障检测方法都容易受到脑裂（split brain）问题的影响。如果备份服务器停止接收来自主服务器的心跳，这可能表明主服务器出现故障，或者可能只是意味着所有仍在运行的服务器之间的网络连接丢失。如果备份VM随后上线，而主VM也仍然在运行，对于与VM通信的客户端而言可能会有数据损坏以及其他问题。因此，我们必须确保当检测到故障时，主VM和备份VM只有一个在线。为了避免脑裂问题，我们利用共享存储，来存储VM的虚拟磁盘。 当任一主或备份VM想要上线时，它会在共享存储中执行一个原子性的测试设置操作。 如果操作成功，VM 被允许上线。 如果操作失败，那么另一个 VM 一定已经上线，所以当前虚拟机实际上停止了自己（“自杀”）。 如果尝试执行此原子操作时，VM 无法访问共享存储，然后它只是等待，直到可以访问。 注意如果由于存储网络上的某些故障而无法访问共享存储时，那么虚拟机可能无法做有用的工作，因为虚拟磁盘在同样的共享存储中，因此，为了解决脑裂问题而使用共享存储不会引入任何额外的不可接受性。</p>
+<p>这个设计的一个最终方面是一旦故障发生并且一个VM已经上线，VMware FT自动地通过在另一个主机上开始一个新的备份VM，来恢复备份。虽然前面的大部分的工作并未覆盖这个过程，但是它是使故障容忍的VM有效的基础，因此需要谨慎设计。 更多细节将在第 3.1 节中给出。</p>
+<h2 id="三、-故障容忍的实际执行"><a href="#三、-故障容忍的实际执行" class="headerlink" title="三、  故障容忍的实际执行"></a>三、  故障容忍的实际执行</h2><p>第二节描述了我们基础的设计以及FT协议。然而，为了创建一个有用的、健壮的以及自动化的系统，有许多其他组件必须设计实现。</p>
+<h3 id="3-1-启动与重启-FT-VMs"><a href="#3-1-启动与重启-FT-VMs" class="headerlink" title="3.1 启动与重启 FT VMs"></a>3.1 启动与重启 FT VMs</h3><p>最大的附加组件之一必须被设计为如下机制，即启动备份VM时它将拥有和主VM一样的状态。当故障发生后重启一个备份VM时，这个机制也将变得很有用。因此，这个机制一定可用于一个处于任意状态的正在运行中的主VM。此外，我们希望该机制不会显著地中断主VM的执行，因为这会影响 VM 的任何当前客户端。</p>
+<p>对于 VMware FT而言，我们调整了VMware vSphere上现有的 VMotion 功能。 VMware VMotion [10] 允许以最少中断的方式，将正在运行的 VM 从一台服务器迁移到另一台服务器，VM的暂停时间通常不到一秒钟。我们创建了一个VMotion的修改形式，可在远程服务器上创建准确的 VM 运行副本，但不会破坏本地服务器的虚拟机。也就是说，我们修改后的 FT VMotion 将VM克隆到远程主机上而不是迁移它。 FT VMotion还设置了一个日志记录通道，并导致源VM作为主VM进入日志记录模式，而目的VM 作为备份进入重放模式。像平常的VMotion一样，FT VMotion 通常会中断主VM的执行不到一秒。因此，启用 FT在正在运行的 VM 上是一个简单的、无中断的操作。</p>
+<p>启动备份 VM 的另一个方面是选择一个运行它的服务器。容错 VM 在服务器集群中运行，可以访问共享存储，因此所有 VM通常可以运行在集群上的任何服务器中。这种灵活性允许VMware vSphere恢复FT冗余，即使一个或多个服务器失效。VMware vSphere 实现了一种集群服务，用于维护管理以及资源信息。 当发生故障并且主VM 现在需要一个新的备份 VM 来重新建立冗余时，主 VM 通知集群服务它需要一个新的备份。 集群服务基于资源利用率以及其他约束，决定运行备份VM最好的服务器，并调用 FT VMotion 以创建新的备份 VM。 结果是 VMware FT通常可以在几分钟内重新建立VM冗余，在一个故障容忍VM的执行上，所有这些都没有任何明显的中断。</p>
+<h3 id="3-2-管理日志通道"><a href="#3-2-管理日志通道" class="headerlink" title="3.2 管理日志通道"></a>3.2 管理日志通道</h3><p><img src="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/figure03.JPG" alt="FT日志缓存和通道" title="FT日志缓存和通道"></p>
+<p>在管理日志通道上的流量时，有许多有趣的实现细节。在我们的实现中，管理程序为主备 VM 的日志记录条目维持了一个大的缓冲区。当主 VM 执行时，它生成日志条目到缓冲区中，类似地，备份VM从它的日志缓冲区中消耗日志条目。主日志缓冲区的内容会被尽快刷新到日志记录通道，这些日志条目一到日志通道，就会被读取到备份的日志缓冲区。备份每次从网络上读取一些日志条目到它的日志缓冲区时，都会发送确认返回给主VM。这些确认允许 VMware FT 确定一个被输入规则延迟的输出何时可以被发送。图3说明了这个过程。</p>
+<p>如果备份 VM 在需要读取下一个日志条目时，遇到空的日志缓冲区，它将停止执行直到有新的日志条目可用。由于备份 VM 是不与外部通信的，此暂停不会影响任何VM 的客户端。同样地，当主VM需要写入一个日志条目时，如果主VM遇到一个完整的日志缓冲区，它必须停止执行，直到可以刷新日志条目。这种执行的停止是一种自然的流控制机制，当主VM生产日志条目太快了，它会减慢主VM。但是，此暂停可能会影响VM的客户端，因为主 VM 将完全停止并且无响应，直到它可以记录其条目并继续执行。因此，我们的实现必须设计为尽量减少主日志缓冲区填满的可能性。</p>
+<p>主日志缓冲区可能填满的原因之一是备份 VM 执行速度太慢，因此消耗日志条目太慢。一般来说，备份VM必须能够以与正在记录执行的主VM大致相同的速度重放执行。幸运的是，在 VMware 确定性重放中，记录和重放的开销大致相同。然而，如果由于其他VMs，托管备份 VM 的服务器负载很重（因此过度使用资源），备份VM 可能无法获得足够的 CPU 和内存资源，来与主 VM 一样快地执行，尽管备份管理程序的VM调度器已经尽了最大努力。</p>
+<p>如果日志缓冲区填满，除了避免意外暂停，还有另一个原因是我们不希望滞后变得太大。如果主VM出现故障，备份VM 必须通过重放它在上线和开始与外部世界交流之前已经确认的所有日志条目来“赶上”。完成重放的时间基本上是失败点的执行延迟时间，所以备份上线的时间大约等于故障检测时间加上当前执行时差。因此，我们不希望执行滞后时间太大（超过一秒），因为这将显著地增加故障转移时间。</p>
+<p>因此，我们有一个额外的机制减慢主VM，以防止备份 VM 获取太滞后了。在我们的发送和确认日志条目的协议中，我们发送附加信息来确定主备VM之间的实时执行滞后。通常执行滞后小于 100 毫秒。如果备份 VM 有一个显著的执行滞后（例如，超过 1 秒），VMware FT 通过通知调度程序给它稍微少一点的CPU（最初只是百分之几）来减慢主 VM。我们使用一个缓慢的反馈循环，这将尝试逐步确定适当的 CPU 限制，将允许主备 VM同步执行。如果备份 VM 继续滞后，我们继续逐步降低主VM的 CPU 限制。反之，如果备份VM赶上，我们逐渐增加主VM的 CPU 限制，直到备份虚拟机恢复轻微的滞后。</p>
+<p>请注意，主VM的这种减速很少见，通常只在系统处于低压力时发生。第 5 节的所有性能数都包括任何此类放缓的成本。</p>
+<h3 id="3-3-FT-VMs上的操作"><a href="#3-3-FT-VMs上的操作" class="headerlink" title="3.3 FT VMs上的操作"></a>3.3 FT VMs上的操作</h3><p>另一个实际问题是处理各种控制操作，它们可以应用于主 VM 。例如，如果主VM明确关闭电源，备份 VM 也应该停止，而不是尝试上线。 再举一个例子，任何主VM上的资源管理更改（例如增加 CPU 份额）应该 也适用于备份。 对于此类操作，为了影响备份进行合适的操作，特殊的控制条目通过日志通道从主发送到备份。</p>
+<p>一般来说，VM 上的大部分操作都应该仅在主 VM 上初始化。 VMware FT 然后发送任何必要的控制条目以造成备份VM上适当的更改。 唯一可以独立在主VM和备份VM上完成的操作是 VMotion。 也就是说，主VM和备份VM可以独立被 VMotioned到其他主机。 请注意，VMware FT 确保两个 VM 都不会移动到另一个 VM 所在的服务器，因为这种场景将不再提供故障容忍。</p>
+<p>主VM的VMotion增加了比普通VM更多的复杂性，因为备份VM一定会与源主VM失去连接以及在适当的时间重连。备份VM的VMotion有一个相似的问题，但是只增加了一个额外的复杂性。对于一个正常的VMotion而言，我们需要当VMotion上最后的切换发生时，所有的磁盘IO停止（或完成）。对于一个主VM而言，这种停顿可以通过等待，直到物理IO完成并将这些完成信息发送给VM轻易解决。然而，对于一个备份VM而言，没有容易的方式来使得所有IO在任何需要的时刻完成，因为备用VM必须重放主VM的执行过程，并在相同的执行点完成IO。主VM可能正运行在一个工作负载上，在正常执行过程中总是有磁盘IO。VMware FT有一个独一无二的方法来解决这个问题。当一个备份VM是在VMotion最后的切换点时，它需要通过日志通道来告知主VM临时停止所有IO。备份VM的IO将自然地被停止在一个单独的执行点，因为它需要重放主VM的停止操作的过程。</p>
+<h3 id="3-4-磁盘IO的实现问题"><a href="#3-4-磁盘IO的实现问题" class="headerlink" title="3.4 磁盘IO的实现问题"></a>3.4 磁盘IO的实现问题</h3><p>有许多与磁盘IO相关的微小的实现问题。首先，假设磁盘操作是非阻塞的，因此访问相同磁盘位置的并行、同时执行的磁盘操作将引起非确定性。此外，我们的磁盘 IO 实现使用DMA 直接from&#x2F;to虚拟机的内存，所以同时访问相同内存页的磁盘操作也可能导致不确定性。我们的解决方案是经常检测任何此类 IO 竞争（很少见），以及强制此类竞争磁盘操作在主备VM上按顺序执行。</p>
+<p>第二，通过 VM 中的应用程序（或操作系统）时，磁盘操作与内存访问也会存在竞争，因为磁盘操作通过 DMA 直接访问 VM 的内存。例如，如果一个VM 中的应用程序&#x2F;操作系统正在读取内存块，同时对该块进行磁盘读取。这个情况也不太可能发生，但如果它发生，我们必须检测它并处理它。一种解决方案是临时设置页保护，在作为磁盘操作目标的页面上。如果VM 碰巧访问一个页，同时该页面也是磁盘操作的目标，页保护将导致一个陷阱，VM将暂停直到磁盘操作完成。因为改变页上的MMU 保护是一项昂贵的操作，所以我们选择使用弹跳缓冲区（Bounce Buffer）代替。bounce buffer是临时缓冲区，与正在被磁盘操作访问的内存大小相同。磁盘读取操作被修改为读取指定数据到bounce buffer，并在在IO完成时将数据复制到内存中。相似地，对于磁盘写操作，首先将要发送的数据复制到bounce buffer，磁盘写入修改为向bounce buffer写入数据。bounce buffer的使用会减慢磁盘操作，但我们还没有看到它会导致任何明显的性能损失。</p>
+<p>第三，有一些与故障发生并且备份VM接管时，主VM未完成的磁盘 IO 相关的问题。对于新上线的主VM，没有办法确定磁盘IO是有问题的还是成功完成了。另外，由于磁盘IO没有从外部发布到备用VM上，而是通过主备传递，因此对于继续运行的新上任的主VM来说，将没有明确的IO完成信息，最终将导致VM上的操作系统开始中止或者重调度程序。我们能够发送一个错误完成，表示每个IO失败，因为即使IO成功完成了，它可以接受返回一个错误。然而，操作系统可能不能对这些来自本地磁盘的错误有很好的响应。反之，我们在备份VM上线的过程中，重新发送这些挂起的IO。因为我们已经限制了所有的竞争和所有的直接指定内存和磁盘的IO，这些磁盘操作可以被重新发送，即使它们已经成功完成了（即他们是幂等的）。</p>
+<h3 id="3-5-网络IO的实现问题"><a href="#3-5-网络IO的实现问题" class="headerlink" title="3.5 网络IO的实现问题"></a>3.5 网络IO的实现问题</h3><p>VMware vSphere针对VM网络提供了很多性能优化。一些优化是基于管理程序（supervisor）异步更新虚拟机的网络设备状态。例如，当VM正在执行时，接收缓冲区可以由管理程序直接更新。不幸的是这些对 VM 状态的异步更新会增加不确定性。除非我们可以保证所有更新都发生在主备指令流上的同一点，否则备份VM的执行可能与主VM的执行不同。</p>
+<p>对于FT而言，网络仿真代码的最大变化是禁用异步网络优化。异步更新带有传入数据包的VM环形缓冲区的代码已被修改，以强制管理程序捕获到操作系统，它可以在其中记录更新然后将它们应用到 VM。同样，异步地将数据包从传输队列中拉出也被修改了，取而代之的是通过管理程序traps来完成传输（如下所述）。</p>
+<p>网络设备异步更新的消除结合第 2.2 节中描述的发送数据包的延迟带来了一些网络性能的挑战。我们采取了两种方法在运行 FT 时提高 VM 的网络性能。第一，我们实施了集群优化以减少 VM 的陷阱和中断。当 VM 以足够的比特率流式传输数据时，管理程序可以对每组数据包做一个传输trap，在最好的情况下零trap，因为它可以传输所接收新数据包的一部分数据包。同样地，通过仅对于一组数据包发布中断，管理程序可以将接收包的中断数量减少。</p>
+<p>我们对网络的第二个性能优化涉及减少传输数据包的延迟。如前所述，管理程序必须延迟所有发送的包直到它得到备份VM对于某些日志条目的确认。减少发送延迟的关键在于减少发送&#x2F;接收备份VM信息的所需时间。我们的主要优化包括保证收发信息在无需任何线程上下文切换的情形下就可以被执行。VMware vSphere管理程序允许函数被注册到TCP栈中，只要TCP数据被接收到了，函数就会被一个延期执行的上下文调用（和Linux中的tasklet类似）。这允许我们快速处理备份VM上任何即将到来的日志消息，以及主VM接收的任何确认消息，而不需要任何线程上下文的切换。另外，当主VM有一个包要寄出去时，我们强制一次相关输出日志条目的日志刷出（正如2.2节中所描述的），通过调度一个延迟执行的上下文来执行这次刷出。</p>
+<h2 id="四、-可供选择的设计"><a href="#四、-可供选择的设计" class="headerlink" title="四、  可供选择的设计"></a>四、  可供选择的设计</h2><h3 id="4-1-共享-vs-非共享磁盘"><a href="#4-1-共享-vs-非共享磁盘" class="headerlink" title="4.1 共享 vs. 非共享磁盘"></a>4.1 共享 vs. 非共享磁盘</h3><p><img src="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/figure04.JPG" alt="FT非共享磁盘配置" title="FT非共享磁盘配置"></p>
+<p>在我们默认的设计中，主备VM共享相同的虚拟磁盘。因此，如果一次故障转移发生，共享磁盘的内容自然是正确、可接受的。必要地，对于主备VM来说，共享磁盘被认为是外部的，因此任何共享磁盘的写入被认为是一次与外部世界的沟通。因此，只有主VM做这种实际的磁盘写入，并且为了遵循输出规则，这种写入必须被延迟。</p>
+<p>对于主备VM而言，一种可替代的选择是分隔（非共享）的虚拟磁盘。在这种设计中，备份VM要执行所有虚拟磁盘的写入操作。而且这样做的话自然要保持它的虚拟磁盘内容与主VM虚拟磁盘内容一致。图4阐述了这种配置。在非共享磁盘的情况下，虚拟磁盘必须被认为是每个VM的内部状态。因此，依据输出规则，主VM的磁盘写入不必延迟。在共享存储不能被主备VM接受的情况下，非共享的设计是相当有用的。这种情况可能是由于共享存储不可接受或者太昂贵，或者由于运行主备VM的服务器相隔太远（“长距离FT”）。非共享设计的一个缺点是在首次启动故障容错时，虚拟磁盘的两个复制必须以相同的方式进行显示同步。另外，发生故障后磁盘可能会不同步，因此当在一次失败后备份VM重启的时候，他们必须再显式地同步。FT VMotion必须不止同步主备VM的运行状态，还要同步他们的磁盘状态。</p>
+<p>在这种非共享磁盘的配置中，他们也能应付脑裂场景。在这种场景中，系统能够使用一些其他的外部决策者，例如所有服务器可以沟通的一个第三方服务。如果服务器是超过两个节点的集群的一部分，这个系统能够基于集群关系使用一种majority算法。在这个例子中，一个VM能够被允许上线，如果它正在一个服务器上运行，这个服务器是包含大多数原始节点的正在通信的子集群的一部分。</p>
+<h3 id="4-2-在备份VM上执行磁盘读"><a href="#4-2-在备份VM上执行磁盘读" class="headerlink" title="4.2 在备份VM上执行磁盘读"></a>4.2 在备份VM上执行磁盘读</h3><p>在我们默认的设计中，备份的VM从不会从它自己的虚拟磁盘上读取（无论共享还是非共享）。因为磁盘读取被认为是一个输入，它是自然地通过日志通道将磁盘读取的结果发送到备份VM上。</p>
+<p>一种替代的设计是让备份VM执行磁盘读取，因此消除了磁盘读取的日志。对于大多数时候都做磁盘读取的工作负载而言，这种方法可以很好地降低日志通道上的流量。然而，这种方法有很多小问题。它可能会减慢备份VM的执行速度，因为备份VM必须执行所有的磁盘读取，当到达VM执行中主VM已经完成的位置时，如果备份上的磁盘读取还没完成就必须等待。</p>
+<p>同样地，为了处理失败的磁盘读取操作，必须做一些额外的工作。如果一个主VM的磁盘读取成功了，但是相应的备份VM磁盘读取失败了，备份VM的磁盘读取必须重试直到成功。因为备份VM必须获得和主VM一样的数据到内存中。相反地，如果一个主VM的磁盘读取失败了，目标内存的内容必须通过日志通道发送给备份服务器，因此内存的内容将被破坏，不能被备份VM成功的磁盘读取复制。</p>
+<p>最后，如果这种磁盘读取被用于共享磁盘配置的话，还有一个小问题。如果主VM做了一次对具体磁盘位置的读取，然后紧跟相同磁盘位置的写入，然后这个磁盘写必须被延迟到备份VM已经执行了第一次磁盘读取。这种依赖可以被检测和正确处理，但是需要增加实现上额外的复杂性。</p>
+<p>在5.1节中，对于实际的应用而言，我们给出一些性能结果以表示在备份VM上执行磁盘读取会造成一些轻微的吞吐量减少(1-4%)，因此在日志通道的带宽被限制的情况下，在备份VM上执行磁盘读取可能是有用的。</p>
+<h2 id="五、-性能评估"><a href="#五、-性能评估" class="headerlink" title="五、  性能评估"></a>五、  性能评估</h2><p>在这节中，我们做了一次VMware FT性能的基础评估，针对许多应用负载以及网络基准。为了得到这些结果，我们在一样的服务器上运行主备VM，每个都带9个Intel Xeon 2.8Ghz CPU 和 8Gbytes 的 RAM。服务器间通过10 Gbit&#x2F;s的交换机连接，但是在所有的例子中都能看到被使用的网络带宽远远少于1Gbit&#x2F;s。从一个通过标准的4Gbit&#x2F;s的光纤通道网络连接的EMC Clariion中，服务器可以连接他们的共享虚拟磁盘。客户端通过1 Gbit&#x2F;s的网络来驱动一些连接服务器的工作负载。</p>
+<p>我们评估性能结果的应用如下所示。SPECJbb2005是工业标准的Java应用基准，非常耗费CPU和内存，但是IO非常少。Kernel Compile是一种运行Linux核编译的工作负载。由于许多编译过程的创建和毁灭，这个工作负载做很多磁盘读取和写入，是非常耗费CPU和MMU的。Oracle Swingbench是被Swingbench OLTP工作负载（在线事务处理）驱动的一个Oracle 11g的数据库。这个工作负载做连续的磁盘和网络IO，有80个同时在线的数据库会话。MS-SQL DVD Store是一种工作负载，运行了一个Microsoft SQL Server 2005的数据库，有60个同时在线的客户端。</p>
+<h3 id="5-1-基本性能结果"><a href="#5-1-基本性能结果" class="headerlink" title="5.1 基本性能结果"></a>5.1 基本性能结果</h3><p><img src="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/table01.JPG" alt="基本性能结果" title="基本性能结果"></p>
+<p>表 1 列出了基本的性能结果。对于每个应用程序，第二列给出了应用程序的性能比例，运行服务器工作负载的虚拟机上启用和未启用FT的情况。性能比小于 1 表示带FT的工作负载更慢。显然，这些有代表性的工作负载上启用FT 的开销小于10%。 SPECJbb2005 完全受计算限制，没有空闲时间，但其表现性能良好，因为它具有最小的除定时器中断以外的不确定性事件。另一个工作负载做磁盘 IO 有一些空闲时间，所以一些FT 开销可能被 FT虚拟机的空闲时间更少的真实情况隐藏。然而，一般的结论是VMware FT 能够支持故障容忍VM，并且具备相当低的性能开销。</p>
+<p>在表的第三列中，我们给出了当应用程序正在运行时，在日志通道上发送数据的平均带宽。对于这些应用程序，日志带宽相当合理，1 Gbit&#x2F;s的网络就能满足 。事实上，低带宽要求表明多个 FT 工作负载可以共享相同的 1 Gbit&#x2F;s网络，同时没有任何负面的性能影响。</p>
+<p>对于运行常见操作系统的 VM，例如Linux 和 Windows，我们发现当操作系统空闲时，通常的日志记录带宽为 0.5-1.5 Mbits&#x2F;sec。”空闲”带宽主要是记录定时器中断发送的结果。对于具有活动中工作负载的 VM而言，日志带宽由网络和必须发送到备份的磁盘输入主导—网络收到的数据包和从磁盘读取的磁盘块。因此，对于非常高的网络接收或者磁盘读取带宽的应用而言，日志带宽高于表1中的测量值。对于这类应用而言，日志通道的带宽可能是瓶颈，特别是日志通道还有其他使用时。</p>
+<p>对于许多实际应用程序而言，日志记录所需的带宽相对较低，这使得基于重放的故障容忍对于使用非共享磁盘的长距离配置非常有吸引力。对于远距离配置而言，其主备VM可能相隔1-100公里，光纤可以轻松地支持延迟小于 10 毫秒的100-1000 Mbit&#x2F;s带宽。对于表 1 中的应用而言，主备之间的额外往返延迟，可能会导致网络和磁盘输出最多延迟 20 毫秒。远距离配置仅适用于这类应用程序：他的客户端可以容忍每个请求的额外延迟。</p>
+<p>对于两个最占用磁盘空间的应用程序，我们测量了在备份 VM上执行磁盘读取（如第 4.2 节所述）与通过日志记录通道发送磁盘读取数据相比，对于性能的影响。对于 Oracle Swingbench来说，在备份VM上执行磁盘读取时的吞吐量降低约 4%；对于 MS-SQL DVD 存储，吞吐量约降低 1%。同时，Oracle Swingbench的日志带宽从 12 Mbits&#x2F;sec 降低到 3 Mbits&#x2F;sec，MS-SQL DVD 存储从 18 Mbits&#x2F;sec 降低到 8 Mbits&#x2F;sec。显然，对于具有更大磁盘读取带宽的应用程序，带宽可能会节省很多。如第 4.2 节所述，预计在备份 VM 上执行磁盘读取时，性能可能会更差。但是，对于日志通道的带宽是有限的（例如，远程配置）情况下，在备份 VM 上执行磁盘读取可能有用。</p>
+<h3 id="5-2-网络基准测试"><a href="#5-2-网络基准测试" class="headerlink" title="5.2 网络基准测试"></a>5.2 网络基准测试</h3><p><img src="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/table02.JPG" alt="日志通道对网络传输性能的影响" title="日志通道对网络传输性能的影响"></p>
+<p>出于多种原因。网络基准测试对我们的系统来说非常具有挑战性。第一，高速网络会有一个非常高的中断率，这需要以非常高的速度记录和重放异步事件。 第二，以高速率接收数据包的基准将导致高速率的日志流量，因为所有这些数据包必须通过日志通道发送到备份。第三，发送数据包的基准测试将受制于输出规则，延迟网络数据包的发送直到已收到来自备份VM的确认。 此延迟会增加对客户端测量的延迟。这种延迟还可能会降低到客户端的网络带宽，因为网络协议（如 TCP）由于往返延迟增加，可能不得不降低网络传输速率。</p>
+<p>表 2 给出了我们通过标准的netperf 基准测试，多次测量的结果。在所有这些测量中，客户端 VM 和主 VM 通过 1 Gbit&#x2F;s 网络连接。前两行给出了主备主机间通过1 Gbit&#x2F;s 的日志通道连接时，发送和接收的性能。第三行和第四行给出当主备服务器通过10 Gbit&#x2F;s的日志通道连接时，发送和接收的性能，不仅带宽更高，延迟也低于 1 Gbit&#x2F;s。作为一个粗略的测量，在1 Gbit&#x2F;s 网络连接的管理程序之间， ping 时间约为 150 微秒，而对于 10 Gbit&#x2F;s 连接，ping时间大约需要 90 微秒。</p>
+<p>未启用 FT 时，主 VM 对于接收和发送，可以实现接近 (940 Mbit&#x2F;s) 1 Gbit&#x2F;s 的线路传输速率。当为接收工作负载启用 FT 时，日志记录带宽非常大，因为所有传入的网络数据包必须在日志通道上发送。因此，日志记录通道可能成为瓶颈，正如1 Gbit&#x2F;s 日志网络的结果。对于 10 Gbit&#x2F;s 的日志网络，影响则小了很多。当为上传工作负载启用 FT 时，上传数据包的数据不会记录，但仍必须记录网络中断。日志带宽要低得多，因此可实现的网络上传带宽高于网络接收带宽。总的来说，我们看到 FT 在非常高的上传和接收速率情况下，可以显著地限制网络带宽，但仍然可以实现很高的速率。</p>
+<h2 id="六、-相关工作"><a href="#六、-相关工作" class="headerlink" title="六、  相关工作"></a>六、  相关工作</h2><p>Bressoud 和 Schneider [3] 描述了实施的最初想法，通过完全包含在管理程序级别的软件对虚拟机进行故障容忍。他们展示了保持一个备份虚拟机的可行性，该备份通过配备 HP PA-RISC 处理器的服务器原型与主虚拟机同步。但是，由于PA-RISC 架构的限制，他们无法实现完全安全、隔离的虚拟机。此外，他们没有实现任何故障检测方法，也没有尝试解决第 3 节中描述的任何实际问题。更重要的是，他们对他们的 FT 协议提出的很多限制是不必要的。首先，他们强加了epoch的概念，其中异步事件被延迟到设定的时间间隔结束。一个epoch的概念是不必要的—他们可能强加了它，因为他们无法足够有效地重放单个异步事件。其次，他们要求主虚拟机基本上停止执行，直到备份收到并且确认所有以前的日志条目。然而，只有输出本身（例如网络数据包）必须延迟 –主 VM 本身可能会继续执行。</p>
+<p>Bressoud [4] 描述了一个在操作系统（Unixware）中实现故障容忍的系统，因此为在该操作系统上运行的所有应用程序提供容错。系统调用接口变成了必须确定性地复制的一组操作。这项工作与基于管理程序的工作有着相似的限制与设计选择。</p>
+<p>纳珀等人 [9] 以及 Friedman 和 Kama [7] 描述了故障容忍 Java 虚拟机的设计。他们在日志通道中发送输入与非确定性操作时遵循与我们类似的设计。像 Bressoud 一样，他们似乎并不专注于检测故障并在故障后重新建立容错。此外，它们的实现仅限于对在 Java 虚拟机中运行的应用程序提供故障容忍。这些系统试图处理多线程Java 应用程序的问题，但要求所有数据都正确地受锁保护或强制执行序列化到共享内存。</p>
+<p>邓拉普等 [6] 描述了确定性重放的实现，主要针对在半虚拟化系统上调试应用软件。我们的工作支持在虚拟机内运行的任何操作系统并实现了对这些 VM 的容错支持，这需要更高水平的稳定性和性能。</p>
+<p>库利等人[5] 描述了一种支持故障容忍VMs的替代方法，并且在一个名为Remus的项目里实现了。通过这种方法，在执行期间主VM的状态被反复检查，并且被发送到备份服务器，该服务器收集检查点信息。检查点必须非常频繁地执行（每秒多次），因为外部输出必须延迟到下一个检查点被发送和确认。这种方法的优点是它同样适用于单处理器和多处理器 VM。</p>
+<p>这种方法的主要问题是有非常高的网络带宽需要，以将每个检查点内存状态的增量更改发送出去。 Remus 的结果[5] 显示，对于发送内存状态的改变，当使用一个1 Gbit&#x2F;s 网络连接尝试每秒做40个检查点时，内核编译与SPECweb 基准测试减速 100% 到 225%。有许多优化可能有助于减少所需的网络带宽，但不清楚1 Gbit&#x2F;s 连接是否可以实现合理的性能。相比之下，我们基于确定性重放的方法可以实现低于 10% 的开销，在几个真实应用中主备主机所需的带宽远远少于 20 Mbit&#x2F;s。</p>
+<h2 id="七、-结论及未来工作"><a href="#七、-结论及未来工作" class="headerlink" title="七、  结论及未来工作"></a>七、  结论及未来工作</h2><p>我们在VMware vSphere 中设计并实施了一个高效完整的系统(FT) ，用于为服务器上运行的虚拟机提供容错。我们的设计基于复制主VM中的执行，再通过另一台主机上的备份VM执行VMware确定性重放。如果运行主 VM的服务器出现故障，备份 VM 能立即接管且不会中断或丢失数据。</p>
+<p>总体而言，在商业硬件上运行VMware FT时，故障容错VM的性能非常出色，并且对于某些典型应用程序，其开销低于 10%。大多数 VMware FT 的性能成本来自于使用 VMware 确定性重放来保持主备VM同步。因此，VMware FT 的低开销源自 VMware 确定性重放的效率。此外，保持主备同步所需的日志带宽非常小，通常小于 20 Mbit&#x2F;s。因为日志带宽在大多数情况下很小，主备相隔很长的距离（1-100公里）似乎也是可行的实施配置。因此，VMware FT 可用于这种场景：可以防止整个站点发生故障的灾难。值得注意的是，日志流通常是可压缩的，因此简单的压缩技术可以显著地减少日志带宽，虽然有少量额外的 CPU 开销。</p>
+<p>我们对 VMware FT 的结果表明，一个高效的故障容错VM的实现可以建立在确定性重放的基础上。这样的系统可以透明地为运行任何操作系统和应用的虚拟机提供容错能力，仅会带来极小的开销。然而，对客户有用的故障容错VM系统而言，它必须还具有强大、易于使用和高度自动化的特点。一个可用的系统除了复制虚拟机执行之外，还需要许多其他组件。特别是VMware FT 故障后自动地恢复冗余，通过在本地集群中找到合适的服务器并在其上创建一个新的备份VM。通过解决所有必要的问题，我们已经展示了一个在客户的数据中心可用于实际应用的系统。</p>
+<p>通过确定性重放实现容错的权衡之一是当前确定性重放仅针对单处理器VM 。然而，单处理器虚拟机足够应付各种各样的工作负载，特别是因为物理处理器不断变得更加强大。此外，许多工作负载可以通过使用许多单处理器的虚拟机来扩展，而不是通过使用一个更大的多处理器虚拟机来扩展。多处理器 VM 的高性能重放是一种活跃的研究领域，并且可以潜在地被微处理器中的一些额外硬件支持。一个有趣的方向可能是扩展事务内存模型以促进多处理器重放。</p>
+<p>将来，我们也有兴趣扩展我们的系统处理部分硬件故障。通过部分硬件故障，我们的意思是服务器上功能或冗余的部分丢失，不会导致损坏或丢失数据。一个例子是到 VM所有网络连接的丢失，或在物理服务器中备用电源丢失。如果在运行主 VM 的服务器上发生部分硬件故障，在许多情况下（但不是all) 故障转移到备份 VM 将是有利的。这样的故障转移对于关键VM而言，可以立即恢复完整服务，并确保虚拟机从可能不可靠的服务器上快速地移出。</p>
+<h2 id="References"><a href="#References" class="headerlink" title="References"></a>References</h2><p>[1] Alsberg, P., and Day, J. A Principle for Resilient Sharing of Distributed Resources. In Proceedings of the Second International Conference on Software Engineering (1976), pp. 627–644.</p>
+<p>[2] AMD Corporation. AMD64 Architecture Programmer’s Manual. Sunnyvale, CA.</p>
+<p>[3] Bressoud, T., and Schneider, F. Hypervisor-based Fault Tolerance. In Proceedings of SOSP 15 (Dec. 1995).</p>
+<p>[4] Bressoud, T. C. TFT: A Software System for Application-Transparent Fault Tolerance. In Proceedings of the Twenty-Eighth Annual International Symposium on FaultTolerance Computing (June 1998), pp. 128–137.</p>
+<p>[5] Cully, B., Lefebvre, G., Meyer, D., Feeley, M., Hutchison, N., and Warfield, A. Remus: High Availability via Asynchronous Virtual Machine Replication. In Proceedings of the Fifth USENIX Symposium on Networked Systems Design and Implementation (Apr. 2008), pp. 161–174.</p>
+<p>[6] Dunlap, G. W., King, S. T., Cinar, S., Basrai, M., and Chen, P. M. ReVirt: Enabling Intrusion Analysis through Virtual Machine Logging and Replay. In Proceedings of the 2002 Symposium on Operating Systems Design and Implementation (Dec. 2002).</p>
+<p>[7] Friedman, R., and Kama, A. Transparent Fault-Tolerant Java Virtual Machine. In Proceedings of Reliable Distributed System (Oct. 2003), pp. 319–328.</p>
+<p>[8] Intel Corporation. IntelAˆR 64 and IA-32 Architectures Software Developer’s Manuals. Santa Clara, CA.</p>
+<p>[9] Napper, J., Alvisi, L., and Vin, H. A Fault-Tolerant Java Virtual Machine. In Proceedings of the International Conference on Dependable Systems and Networks (June 2002), pp. 425–434.</p>
+<p>[10] Nelson, M., Lim, B.-H., and Hutchins, G. Fast Transparent Migration for Virtual Machines. In Proceedings of the 2005 Annual USENIX Technical Conference (Apr. 2005).</p>
+<p>[11] Nightingale, E. B., Veeraraghavan, K., Chen, P. M., and Flinn, J. Rethink the Sync. In Proceedings of the 2006 Symposium on Operating Systems Design and<br>Implementation (Nov. 2002).</p>
+<p>[12] Schlicting, R., and Schneider, F. B. Fail-stop Processors: An Approach to Designing Fault-tolerant Computing Systems. ACM Computing Surveys 1, 3 (Aug.<br>1983), 222–238.</p>
+<p>[13] Schneider, F. B. Implementing fault-tolerance services using the state machine approach: A tutorial. ACM Computing Surveys 22, 4 (Dec. 1990), 299–319.</p>
+<p>[14] Stratus Technologies. Benefit from Stratus Continuing Processing Technology: Automatic 99.999% Uptime for Microsoft Windows Server Environments. At <a target="_blank" rel="noopener" href="http://www.stratus.com/pdf/whitepapers/continuous-processing-for-windows.pdf">http://www.stratus.com/pdf/whitepapers/continuous-processing-for-windows.pdf</a>, June 2009.</p>
+<p>[15] Xu, M., Malyugin, V., Sheldon, J., Venkitachalam, G., and Weissman, B. ReTrace: Collecting Execution Traces with Virtual Machine Deterministic Replay. In<br>Proceedings of the 2007 Workshop on Modeling, Benchmarking, and Simulation (June 2007).</p>
+
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2023/03/26/The-Google-File-System/" data-id="clfou6xci0001gjoie9h7ekds" data-title="The Google File System" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/" data-id="clfourovz0001idoieihe3cjz" data-title="The Design for a Practical System for Fault-Tolerant Virtual Machines" class="article-share-link">Share</a>
       
       
       
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/virtual-machine/" rel="tag">virtual machine</a></li></ul>
+
     </footer>
   </div>
   
@@ -111,12 +220,16 @@
 
 
   
-    <article id="post-hello-world" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+    <article id="post-The-Google-File-System" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
-    <a href="/2023/03/26/hello-world/" class="article-date">
-  <time class="dt-published" datetime="2023-03-26T03:24:33.003Z" itemprop="datePublished">2023-03-26</time>
+    <a href="/2022/08/31/The-Google-File-System/" class="article-date">
+  <time class="dt-published" datetime="2022-08-31T22:10:00.000Z" itemprop="datePublished">2022-09-01</time>
 </a>
     
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Course/">Course</a>►<a class="article-category-link" href="/categories/Course/Paper/">Paper</a>
+  </div>
+
   </div>
   <div class="article-inner">
     
@@ -125,7 +238,7 @@
         
   
     <h1 itemprop="name">
-      <a class="p-name article-title" href="/2023/03/26/hello-world/">Hello World</a>
+      <a class="p-name article-title" href="/2022/08/31/The-Google-File-System/">The Google File System</a>
     </h1>
   
 
@@ -133,27 +246,215 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+        <h1 id="Google文件系统"><a href="#Google文件系统" class="headerlink" title="Google文件系统"></a>Google文件系统</h1><h2 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h2><p>GFS（Google File System）是由我们设计并实现的为大规模分布式数据密集型应用程序设计的可伸缩的分布式文件系统。GFS为在廉价商用设备上运行提供了容错能力，并可以在有大量客户端的情况下提供较高的整体性能。</p>
+<p>GFS的设计来自于我们对我们的应用负载与技术环境的观察。虽然GFS与过去的分布式文件系统有着共同的目标，但是根据我们的观察，我们的应用负载和技术环境与过去的分布式系统所做的假设有明显的不同。这让我们重新审视了传统的选择并去探索完全不同的设计。</p>
+<p>GFS很好地满足了我们的存储需求。GFS在Google被广泛地作为存储平台部署，用于生成、处理我们服务所使用的数据或用于需要大规模数据集的研发工作。到目前为止，最大的GFS集群有上千台机器、上千块磁盘，并提供了上百TB的存储能力。</p>
+<p>在本文中，我们介绍了为支持分布式应用程序而设计的文件系统接口的扩展，还从多方面讨论了我们的设计，并给出了微型基准测试与在现实场景中的使用表现。</p>
+<h2 id="一、-引言"><a href="#一、-引言" class="headerlink" title="一、   引言"></a>一、   引言</h2><p>为了满足Google快速增长的数据处理需求，我们设计并实现了GFS。GFS与过去的分布式系统有着很多相同的目标，如性能、可伸缩性、可靠性和可用性。但是我们的设计来自于我们对我们的应用负载与技术环境的观察。这些观察反映了与过去的分布式系统所做的假设明显不同的结果。因此，我们重新审视的传统的选择并探索了完全不同的设计。</p>
+<p>首先，我们认为设备故障经常发生。GFS由成百上千台由廉价设备组成的存储节点组成，并被与其数量相当的客户端访问。设备的数量和质量决定了几乎在任何时间都会有部分设备无法正常工作，甚至部分设备无法从当前故障中分恢复。我们遇到过的问题包括：应用程序bug、操作系统bug、人为错误和硬盘、内存、插头、网络、电源等设备故障。因此，系统必须具有持续监控、错误检测、容错与自动恢复的能力。</p>
+<p>第二，文件比传统标准更大。数GB大小的文件是十分常见的。每个文件一般包含很多引用程序使用的对象，如Web文档等。因为我们的数据集由数十亿个总计数TB的对象组成，且这个数字还在快速增长，所以管理数十亿个几KB大小的文件是非常不明智的，即使操作系统支持这种操作。因此，我们需要重新考虑像I&#x2F;O操作和chunk大小等设计和参数。</p>
+<p>第三，大部分文件会以“追加”的方式变更，而非“覆写”。在实际场景中，几乎不存在对文件的随机写入。文件一旦被写入，即为只读的，且通常仅被顺序读取。很多数据都有这样的特征。如数据分析程序扫描的大型数据集、流式程序持续生成的数据、归档数据、由一台机器生产并同时或稍后在另一台机器上处理的数据等。鉴于这种对大文件的访问模式，追加成了为了性能优化和原子性保证的重点关注目标，而客户端中对chunk数据的缓存则不再重要。</p>
+<p>第四，同时设计应用程序和文件系统API便于提高整个系统的灵活性。例如，我们放宽了GFS的一致性协议，从而大幅简化了系统，减少了应用程序的负担。我们还引入了一种在不需要额外同步操作的条件下允许多个客户端并发将数据追加到同一个文件的原子性操作。我们将在后文中讨论更多的细节。</p>
+<p>目前，我们部署了多个GFS集群并用于不同的目的。其中最大的集群有超过1000个存储节点、超过300TB的磁盘存储，并被数百台客户端连续不断地访问。</p>
+<h2 id="二、-设计概述"><a href="#二、-设计概述" class="headerlink" title="二、   设计概述"></a>二、   设计概述</h2><h3 id="2-1-假设"><a href="#2-1-假设" class="headerlink" title="2.1 假设"></a>2.1 假设</h3><p>在设计能够满足我们需求的文件系统时，我们提出并遵循了一些挑战与机遇并存的假设。之前我们已经提到了一些，现在我们将更详细地阐述我们的假设。</p>
+<ul>
+<li><p>系统有许多可能经常发生故障的廉价的商用设备组成。它必须具有持续监控自身并检测故障、容错、及时从设备故障中恢复的能力。</p>
+</li>
+<li><p>系统存储一定数量的大文件。我们的期望是能够存储几百万个大小为100MB左右或更大的文件。系统中经常有几GB的文件，且这些文件需要被高效管理。系统同样必须支持小文件，但是不需要对其进行优化。</p>
+</li>
+<li><p>系统负载主要来自两种读操作：大规模的流式读取和小规模的随机读取。在大规模的流式读取中，每次读取通常会读几百KB、1MB或更多。来自同一个客户端的连续的读操作通常会连续读文件的一个区域。小规模的随机读取通常会在文件的某个任意偏移位置读几KB。性能敏感的应用程序通常会将排序并批量进行小规模的随机读取，这样可以顺序遍历文件而不是来回遍历。</p>
+</li>
+<li><p>系统负载还来自很多对文件的大规模追加写入。一般来说，写入的规模与读取的规模相似。文件一旦被写入就几乎不会被再次修改。系统同样支持小规模随机写入，但并不需要高效执行。</p>
+</li>
+<li><p>系统必须良好地定义并实现多个客户端并发向同一个文件追加数据的语义。我们的文件通常在生产者-消费者队列中或多路归并中使用。来自不同机器的数百个生产者会并发地向同一个文件追加写入数据。因此，最小化原子性需要的同步开销是非常重要的。文件在被生产后可能同时或稍后被消费者读取。</p>
+</li>
+<li><p>持续的高吞吐比低延迟更重要。我们的大多数应用程序更重视告诉处理大量数据，而很少有应用程序对单个读写操作有严格的响应时间的需求。</p>
+</li>
+</ul>
+<h3 id="2-2-接口"><a href="#2-2-接口" class="headerlink" title="2.2 接口"></a>2.2 接口</h3><p>GFS提供了一个熟悉的文件系统接口，尽管它没有实现POSIX等标准API。文件以目录的形式分层组织，并由路径名标识。我们支持创建、删除、打开、关闭、读取和写入文件的常用操作。</p>
+<p>此外，GFS具有快照和记录追加（record append）操作。快照以较低的成本创建文件或目录树的副本。记录追加允许多个客户端同时向同一个文件追加数据，同时保证每个客户端追加的原子性。它对于实现多路归并结果和生产者消费者队列非常有用，许多客户端可以同时附加到这些队列中，而不需要额外的锁。我们发现这些类型的文件在构建大型分布式应用程序时非常有用。快照和记录追加分别在第3.4节和3.3节中进一步讨论。</p>
+<h3 id="2-3-架构"><a href="#2-3-架构" class="headerlink" title="2.3 架构"></a>2.3 架构</h3><p>一个GFS集群由单个主服务器<em>master</em>和多个块服务器<em>chunkserver</em>组成，由多个<em>client</em>客户端访问，如图1所示。它们通常都是一台运行用户级服务器进程的商用Linux机器。在同一台机器上同时运行一个chunkserver和一个client是很容易的，只要机器资源允许，并且运行可能不可靠的应用程序代码所导致的低可靠性是可以接受的.</p>
+<p><img src="/2022/08/31/The-Google-File-System/figure01.JPG" alt="GFS架构" title="GFS架构"></p>
+<p><strong>图1：GFS架构</strong></p>
+<p>文件被分成固定大小的<em>chunk</em>块。每个chunk都由一个不可变的、全局唯一的64位<em>chunk handle</em>块句柄来标识，该句柄是在chunk创建时由master分配的。chunkserver将chunk以Linux文件的形式存储在本地磁盘上，并通过chunk handle和字节范围来读写chunk数据。为了提高可靠性，每个chunk都被复制到多个chunkserver上。默认情况下，我们存储三个副本，但是用户可以为文件命名空间的不同区域指定不同的复制级别。</p>
+<p>Master维护所有文件系统元数据。这包括命名空间、访问控制信息、从文件到chunk的映射以及chunk的当前位置。它还控制系统范围的活动，如chunk租约的管理、孤立块的垃圾收集和chunkserver之间的块迁移。master通过<em>HeartBeat</em>消息定期与每个chunkserver通信，给它指令并收集它的状态。</p>
+<p>链接到每个应用程序中的GFS client代码实现了文件系统API，并与master和chunkserver通信，以代表应用程序读写数据。client与master进行元数据操作，但所有承载数据的通信都直接到chunkserver。我们不提供POSIX API，因此不需要挂接到Linux vnode层</p>
+<p>client和chunkserver都不会缓存文件数据。client缓存几乎没有什么好处，因为大部分应用程序需要流式地处理大文件，或者数据集过大以至于无法缓存。不使用它们可以消除缓存一致性问题，从而简化client和整个系统。(然而，client缓存元数据。)chunkserver不需要缓存文件数据，因为chunk存储为本地文件，所以Linux的缓冲缓存已经将频繁访问的数据保存在内存中。</p>
+<h3 id="2-4-单Master"><a href="#2-4-单Master" class="headerlink" title="2.4 单Master"></a>2.4 单Master</h3><p>单master大大的简化了我们的设计，单master能够放心使用全局策略执行复杂的chunk布置、制定复制决策等。然而，我们必须在读写过程中尽量减少对它的依赖，它才不会成为一个瓶颈。client从不通过master读写文件，它只会询问master自己应该访问哪个chunkserver。client会缓存这个信息一段时间，随后的很多操作即可以复用此缓存，与chunkserver直接交互。</p>
+<p>我们利用图1来展示一个简单读操作的交互过程。首先，使用固定的chunk size，client将应用程序指定的文件名和字节偏移量翻译为一个GFS文件及内部chunk序号，随后将它们作为参数，发送请求到master。master找到对应的chunk handle和副本位置，回复给client。client缓存这些信息，使用GFS文件名+chunk序号作为key。</p>
+<p>client然后发送一个读请求到其中一个副本，很可能是最近的那个。请求中指定了chunk handle以及在此chunk中读取的字节范围。后面对相同chunk的读不再与master交互，直到client缓存信息过期或者文件被重新打开。事实上，client通常会在一个与master的请求中顺带多索要一些其他chunk的信息，而且master也可能将客户端索要chunk后面紧跟的其他chunk信息主动回复回去。这些额外的信息避免了未来可能发生的一些client-master交互，几乎不会导致额外的花费。</p>
+<h3 id="2-5-chunk块大小"><a href="#2-5-chunk块大小" class="headerlink" title="2.5 chunk块大小"></a>2.5 chunk块大小</h3><p>chunk的大小是一个设计的关键参数。我们选择这个大小为64M，远远大于典型的文件系统的block大小。每一个chunk的副本都是作为在chunkserver上的Linux文件格式存放的，并且只有当需要的情况下才会增长。可以通过惰性空间分配的机制来避免由于内部碎片造成的空间浪费，对于这样大的chunksize来说，内部碎片可能是一个最大的缺陷了。</p>
+<p>选择一个很大的chunk大小提供了一些重要的好处。首先，它减少了client和master的交互，因为在同一个chunk内的读写操作之需要client初始询问一次master关于chunk位置信息就可以了。这个减少访问量对于我们的系统来说是很显著的，因为我们的应用大部分是顺序读写超大文件的。即使是对小范围的随机读，client可以很容易缓存一个好几个TB数据文件的所有的位置信息。其次，由于是使用一个大的chunk，client可以在一个chunk上完成更多的操作，它可以通过维持一个到chunkserver的TCP长连接来减少网络管理量。第三，它减少了元数据在master上的大小。这个使得我们可以把元数据保存在内存，这样带来一些其他的好处，详细请见2.6.1节。</p>
+<p>在另一方面，选择一个大型的chunk，就算是采用惰性空间分配的模式，也有它的不好的地方。小型文件包含较少数量的chunk，也许只有一个chunk。保存这些文件的chunkserver就会在大量client访问的时候就会成为hot spots。在实践中，hot spots问题不太重要，因为我们的应用大部分都是顺序读取包含很多chunk的大文件。</p>
+<p>不过，随着batch-queue系统开始使用GFS系统的时候，hot spots问题就显现出来了：一个可执行的程序在GFS上保存成为一个单chunk的文件，并且在数百台机器上一起启动的时候就出现hot spots问题。只有两三个chunkserver保存这个可执行的文件，但是有好几百台机器一起请求加载这个文件导致系统局部过载。我们通过把这样的执行文件保存份数增加，以及错开batch-queue系统的各worker启动时间来解决这样的问题。一劳永逸的解决方法是让client能够互相读取数据，这样才是解决之道。</p>
+<h3 id="2-6-元数据"><a href="#2-6-元数据" class="headerlink" title="2.6 元数据"></a>2.6 元数据</h3><p>master存储了三种主要类型的元数据：文件和chunk的命名空间，文件到chunk的映射，以及每个chunk副本的位置。所有的元数据都保留在master的内存中。前两个类型（命名空间和文件到chunk的映射）通过将操作记录存储在本地磁盘上的日志文件中得以永久保存，并在远程的机器上进行日志备份。使用日志使我们能够简单可靠的更新master状态，并且不用担心由于master崩溃而造成的不一致性。master不会永久的保存chunk的位置信息，相反，master会在启动时，以及有新的chunkserver加入集群时，询问每个chunkserver的chunk信息。</p>
+<h4 id="2-6-1-内存数据结构"><a href="#2-6-1-内存数据结构" class="headerlink" title="2.6.1 内存数据结构"></a><em>2.6.1 内存数据结构</em></h4><p>由于元数据存放在内存中，所以master的操作非常快。此外，它也使master能够周期性的在后台简单有效的浏览整个系统的状态。这个周期性的浏览操作用于实现chunk的垃圾回收，chunkserver出错后的重复制，以及均衡负载和磁盘空间使用的块迁移。4.3和4.4节会深入的讨论这些行为。</p>
+<p>对于这种内存存储的方法有一个潜在的问题，块的数量和将来整个系统的容量受到master的内存大小限制。在实际中，这不是一个严重的问题，主节点为每个64MB大小的块保留不到64字节的元数据。大多数块都是满的，因为大多数文件都包含了多个块，只有最后一个块才可能被部分使用。相似的，每个文件命名空间数据通常也不到64字节，因为它使用前缀压缩来简洁的存储文件名。</p>
+<p>即使是要支持更大的文件系统，为master增加额外的内存的花费，比起将元数据存放在内存中所带来的简单性、可靠性、有效性和扩展性来说，也是相当值得的。</p>
+<h4 id="2-6-2-chunk位置"><a href="#2-6-2-chunk位置" class="headerlink" title="2.6.2 chunk位置"></a><em>2.6.2 chunk位置</em></h4><p>master并不持久化保存chunkserver上保存的chunk的记录。它只是在启动的时候简单的从chunkserver取得这些信息。master可以在启动之后一直保持自己的这些信息是最新的，因为它控制所有的chunk的位置，并且使用普通心跳信息监视chunkserver的状态。</p>
+<p>我们最开始尝试想把chunk位置信息持久化保存在master上，但是我们后来发现如果在启动时候，以及定期性从chunkserver上读取chunk位置信息会使得设计简化很多。因为这样可以消除master和chunkserver之间进行chunk信息的同步问题，当chunkserver加入和离开集群，更改名字，失效，重新启动等等时候，如果master上要求保存chunk信息，那么就会存在信息同步的问题。在一个数百台机器的组成的集群中，这样的发生chunserver的变动实在是太平常了。</p>
+<p>此外，不在master上保存chunk位置信息的一个重要原因是因为只有chunkserver对于chunk到底在不在自己机器上有着最后的话语权。另外，在master上保存这个信息也是没有必要的，因为有很多原因可以导致chunserver可能忽然就丢失了这个chunk（比如磁盘坏掉了等等），或者chunkserver忽然改了名字，那么master上保存这个资料啥用处也没有。</p>
+<h4 id="2-6-3-操作日志"><a href="#2-6-3-操作日志" class="headerlink" title="2.6.3 操作日志"></a><em>2.6.3 操作日志</em></h4><p>操作日志包含重要的元数据变更的历史记录。这是GFS的核心。它不仅是元数据中唯一被持久化的记录，还充当了定义并发操作顺序的逻辑时间线。带有版本号的文件和chunk都在他们被创建时由逻辑时间唯一、永久地确定。</p>
+<p>操作日志是GFS至关重要的部分，其必须被可靠存储，且在元数据的变更被持久化前不能让client对变更可见。否则当故障发生时，即使chunk本身没有故障，但是整个文件系统或者client最近的操作会损坏。我们将操作日志备份到多台远程主机上，且只有当当前操作记录条目被本地和远程机器均写入到了磁盘后才能向client发出响应。master会在操作记录被写入前批量合并一些记录日志来减少写入和备份操作对整个系统吞吐量的影响。</p>
+<p>master通过重放操作日志来恢复其文件系统的状态。操作日志要尽可能小以减少启动时间。当日志超过一定大小时，master会对其状态创建一个检查点（checkpoint），这样master就可以从磁盘加载最后一个检查点并重放该检查点后的日志来恢复状态。检查点的结构为一个紧凑的B树，这样它就可以在内存中被直接映射，且在查找命名空间时不需要进行额外的解析。这进一步提高了恢复速度，并增强了系统的可用性。</p>
+<p>因为创建一个检查点需要一段时间，所以master被设计为可以在不推迟新到来的变更的情况下创建检查点。创建检查点时，master会切换到一个新的日志文件并在一个独立的线程中创建检查点。这个新的检查点包含了在切换前的所有变更。一个有着几百万个文件的集群可以再一分钟左右创建一个检查点。当检查点被创建完成后，它会被写入master本地和远程主机的磁盘中。</p>
+<p>恢复仅需要最后一个完整的检查点和后续的日志文件。旧的检查点和日志文件可以随意删除，不过我们会保留一段时间以容灾。创建检查点时发生错误不会影响日志的正确性，因为恢复代码会检测并跳过不完整的检查点。</p>
+<h3 id="2-7-一致性模型"><a href="#2-7-一致性模型" class="headerlink" title="2.7 一致性模型"></a>2.7 一致性模型</h3><p>GFS采用宽松的一致性模型，能很好的支持高分布式应用，但同时保持相对简单，易于实现。我们现在讨论GFS的保障机制以及对于应用的意义。我们也着重描述了GFS如何维持这些保障机制，但将一些细节留在了其它章节。</p>
+<h4 id="2-7-1-GFS的保证"><a href="#2-7-1-GFS的保证" class="headerlink" title="2.7.1 GFS的保证"></a><em>2.7.1 GFS的保证</em></h4><p>文件命名空间变化（比如文件创建）是原子的，只有master能处理此种操作：master中提供了命名空间的锁机制，保证了原子性和正确性（章节4.1）；master的操作日志为这些操作定义了一个全局统一的顺序（章节2.6.3）</p>
+<p><img src="/2022/08/31/The-Google-File-System/table01.JPG" alt="变更后文件区域状态" title="变更后文件区域状态"></p>
+<p><strong>表1：变更后文件区域状态</strong></p>
+<p>各种数据变更在不断发生，被它们改变的文件区域处于什么状态？这取决于变更是否成功了、有没有并发变更等各种因素。表1列出了所有可能的结果。对于文件区域A，如果所有客户端从任何副本上读到的数据都是相同的，那A就是consistent。如果A是consistent，并且客户端可以看到变更写入的完整数据，那A就是defined。当一个变更成功了、没有受到并发写的干扰，它写入的区域将会是defined（也是一致的）：所有客户端都能看到这个变更写入的完整数据。对同个区域的多个并发变更成功写入，此区域是consistent，但可能是undefined：所有客户端看到相同的数据，但是它可能不会反应任何一个变更写的东西，可能是多个变更混杂的碎片。一个失败的变更导致区域不一致（也是undefined）：不同客户端可能看到不同的数据在不同的时间点。下面描述我们的应用程序如何区分defined区域和undefined区域。</p>
+<p>数据变更可能是写操作或者记录追加。写操作导致数据被写入一个用户指定的文件偏移。而记录追加导致数据（“记录”）被原子的写入GFS选择的某个偏移（正常情况下是文件末尾，见章节3.3），GFS选择的偏移被返回给客户端，其代表了此record所在的defined区域的起始偏移量。另外，某些异常情况可能会导致GFS在区域之间插入了padding或者重复的record。他们占据的区域可认为是不一致的，不过数据量不大。</p>
+<p>如果一系列变更都成功写入了，GFS保证发生变更的文件区域是defined的，并完整的包含最后一个变更。GFS通过两点来实现：(a) chunk的所有副本按相同的顺序来实施变更（章节3.1）；(b) 使用chunk版本数来侦测任何旧副本，副本变旧可能是因为它发生过故障、错过了变更（章节4.5）。执行变更过程时将跳过旧的副本，客户端调用master获取chunk位置时也不会返回旧副本。GFS会尽早的通过垃圾回收处理掉旧的副本。</p>
+<p>因为客户端缓存了chunk位置，所以它们可能向旧副本发起读请求。不过缓存项有超时机制，文件重新打开时也会更新。而且，我们大部分的文件是append-only的，这种情况下旧副本最坏只是无法返回数据（append-only意味着只增不减也不改，版本旧只意味着会丢数据、少数据），而不会返回过期的、错误的数据。一旦客户端与master联系，它将立刻得到最新的chunk位置（不包含旧副本）。</p>
+<p>在一个变更成功写入很久之后，组件的故障仍然可能腐化、破坏数据。GFS中，master和所有chunkserver之间会持续handshake通讯并交换信息，借此master可以识别故障的chunkserver并且通过检查checksum侦测数据损坏（章节5.2）。一旦发现此问题，会尽快执行一个restore，从合法的副本复制合法数据替代损坏副本（章节4.3）。一个chunk也可能发生不可逆的丢失，那就是在GFS反应过来采取措施之前，所有副本都被丢失。通常GFS在分钟内就能反应。即使出现这种天灾，chunk也只是变得不可用，而不会损坏：应用收到清晰的错误而不是错误的数据。</p>
+<h4 id="2-7-2-对应用程序可能的影响"><a href="#2-7-2-对应用程序可能的影响" class="headerlink" title="2.7.2 对应用程序可能的影响"></a><em>2.7.2 对应用程序可能的影响</em></h4><p>GFS 应用程序可以利用一些简单技术适应这个宽松的一致性模型，这些技术已经满足了其他目的的需要：依赖追加而不是覆写，检查点，自验证，自标识的记录。</p>
+<p>实际中，我们所有的应用通过追加而不是覆写的方式变更文件。一种典型的应用中，写入程序从头到尾地生成一个文件。写完所有数据之后，程序原子性地将文件重命名为一个永久的文件名，或者定期地对成功写入了多少数据设置检查点。检查点也可以包含程序级别的检验和。Readers仅校验并处理上一个检查点之后的文件域，也就是人们知道的已定义状态。不管一致性和并发问题的话，该方法对我们很适合。追加比随机写更有效率，对程序失败有更弹性。检查点允许Writer递增地重启，并且防止Reader成功处理从应用程序的角度看来并未完成的写入的文件数据。</p>
+<p>在另一种典型应用中。许多Writer为了合并结果或者作为生产者-消费者队列并发地向一个文件追加数据。记录追加的“至少追加一次”的语义维持了每个Writer的输出。Reader使用下面的方法来处理偶然的填充和重复。Writer准备的每条记录中都包含了类似检验和的额外信息，以便用来验证它的有效性。Reader可以用检验和识别和丢弃额外的填充数据和记录片段。如果偶尔的重复内容是不能容忍的(比如，如果这些重复数据将要触发非幂等操作)，可以用记录的唯一标识来过滤它们，这些标识符也通常用于命名相应程序实体，例如web文档。这些记录I&#x2F;O功能（除了剔除重复数据）都包含在我们程序共享的代码库（library code）中，并且适用于Google内部其它的文件接口实现。这样，记录的相同序列，加上些许重复数据，总是被分发到记录Reader中。</p>
+<h2 id="三、-系统交互"><a href="#三、-系统交互" class="headerlink" title="三、   系统交互"></a>三、   系统交互</h2><h3 id="3-1-租约和变更顺序"><a href="#3-1-租约和变更顺序" class="headerlink" title="3.1 租约和变更顺序"></a>3.1 租约和变更顺序</h3><p>变更是改变块内容或者块元数据的操作，比如写操作或者追加操作。每次变更在块所有的副本上执行。我们使用租约（lease）来维护副本间的一致性变更顺序。Master向其中一个副本授权一个块租约，我们把这个副本叫做主副本。主副本为对块的所有变更选择一个序列。应用变更的时候所有副本都遵照这个顺序。这样，全局变更顺序首先由master选择的租约授权顺序规定，然后在租约内部由主副本分配的序列号规定。</p>
+<p>设计租约机制的目的是为了最小化master的管理开销。租约的初始过期时间为60秒。然而，只要块正在变更，主副本就可以请求并且通常会得到master无限期的延长。这些延长请求和批准信息附在master和所有Chunkserver之间的定期交换的心跳消息中。Master有时可能试图在到期前取消租约（例如，当master想令一个在一个重命名的文件上进行的修改失效）。即使master和主副本失去联系，它仍然可以安全地在旧的租约到期后和向另外一个副本授权新的租约。</p>
+<p><img src="/2022/08/31/The-Google-File-System/figure02.JPG" alt="写控制和数据流" title="写控制和数据流"></p>
+<p><strong>图2：写控制和数据流</strong></p>
+<p>在图2 中，我们根据写操作的控制流程通过这些标号步骤图示说明了这一过程。</p>
+<p>1．client询问master哪一个chunkserver持有该块当前的租约，以及其它副本的位置。如果没有chunkserver持有租约，master将租约授权给它选择的副本（没有展示）。</p>
+<p>2．master将主副本的标识符以及其它副本（次级副本）的位置返回给client。client为将来的变更缓存这些数据。只有在主副本不可达，或者其回应它已不再持有租约的时候，client才需要再一次联系master。</p>
+<p>3．client将数据推送到所有副本。client可以以任意的顺序推送数据。Chunkserver将数据存储在内部LRU 缓存中，直到数据被使用或者过期。通过将数据流和控制流解耦，我们可以基于网络拓扑而不管哪个chunksever上有主副本，通过调度昂贵的数据流来提高系统性能。3.2章节会作进一步讨论。</p>
+<p>4．当所有的副本都确认接收到了数据，client对主副本发送写请求。这个请求标识了早前推送到所有副本的数据。主副本为接收到的所有变更分配连续的序列号，由于变更可能来自多个client，这就提供了必要的序列化。它以序列号的顺序把变更应用到它自己的本地状态中。</p>
+<p>5．主副本将写请求转发(forward)到所有的次级副本。每个次级副本依照主副本分配的序列顺序应用变更。</p>
+<p>6．所有次级副本回复主副本并标明它们已经完成了操作。</p>
+<p>7．主副本回复client。任何副本遇到的任何错误都报告给client。出错的情况下，写操作可能在主副本和次级副本的任意子集上执行成功。（如果在主副本失败，就不会分配序列号和转发。）client请求被认定为失败，被修改的域处于不一致的状态。我们的client代码通过重试失败的变更来处理这样的错误。在退到从头开始重试之前，client会将从步骤（3）到步骤（7）做几次尝试。</p>
+<p>如果应用程序一次的写入量很大，或者跨越了多个块的范围，GFS clientS代码把它分成多个写操作。它们都遵照上面描述的控制流程，但是可能会被来自其它client的并发操作造成交错或者重写。因此，共享文件域可能以包含来自不同client的片段结尾，尽管如此，由于这些单个的操作在所有的副本上都以相同的顺序完成，副本仍然会是完全相同的。这使文件域处于2.7节提出的一致但是未定义的状态。</p>
+<h3 id="3-2-数据流"><a href="#3-2-数据流" class="headerlink" title="3.2 数据流"></a>3.2 数据流</h3><p>为了高效地利用网络，我们对数据流与控制流进行了解耦。在控制流从client向primary再向所有secondary推送的同时，数据流沿着一条精心挑选的chunkserver链以流水线的方式线性推送。我们的目标是充分利用每台机器的网络带宽，避免网络瓶颈和高延迟的链路，并最小化推送完所有数据的时延。</p>
+<p>为了充分利用机器的网络带宽，数据会沿着chunkserver链线性地推送，而不是通过其他拓扑结构（如树等）分配发送。因此，每台机器全部的出口带宽都被用来尽可能快地传输数据，而不是非给多个接受者。</p>
+<p>为了尽可能地避免网络瓶颈和高延迟的数据链路（例如，交换机间链路（inter-switch）经常同时成为网络瓶颈和高延迟链路），每台机器会将数据传递给在网络拓扑中最近的的且还没有收到数据的机器。假设client正准备将数据推送给S1<del>S4。client会将数据发送给最近的chunkserver，比如S1。S1会将数据传递给S2</del>S4中离它最近的chunkserver，比如S2。同样，S2会将数据传递给S3~S4中离它最近的chunkserver，以此类推。由于我们的网络拓扑非常简单，所以可以通过IP地址来准确地估算出网络拓扑中的“距离”。</p>
+<p>最后，我们通过流水线的方式通过TCP连接传输数据，以最小化时延。当chunkserver收到一部分数据时，它会立刻开始将数据传递给其他chunkserver。因为我们使用全双工的交换网络，所以流水线可以大幅减少时延。发送数据不会减少接受数据的速度。如果没有网络拥塞，理论上将 B 个字节传输给 R 个副本所需的时间为 B&#x2F;T+RL ，其中 T 是网络的吞吐量， L 是两台机器间的传输时延。通常，我们的网络连接吐吞量 T 为 100Mbps ，传输时延 L 远小于 1ms 。</p>
+<h3 id="3-3-原子性记录追加"><a href="#3-3-原子性记录追加" class="headerlink" title="3.3 原子性记录追加"></a>3.3 原子性记录追加</h3><p>GFS提供了一种叫做记录追加的原子追加操作。传统的写操作中，客户程序指定写入数据的偏移量。对同一个域的并行写不是串行的：域可能以包含来自多个client的数据片段结尾。在记录追加中，然而，client只需指定数据。GFS将其原子地追加到文件中至少一次（例如，作为一个连续的byte序列），数据追加到GFS选择的偏移位置，然后将这个偏移量返回给给client。这类似于在Unix中，对以O_APPEND模式打开的文件，多个并发写操作在没有竞态条件时对文件的写入。</p>
+<p>记录追加在我们的分布应用中经常使用，其中很多在不同机器上的客户程序并发对同一文件追加。如果我们采用传统写方式处理，client将需要额外的复杂、昂贵的同步机制，例如通过一个分布式锁管理器。在我们的工作中，这样的文件通常用于多生产者&#x2F;单消费者队列，或者是合并来自多个client的结果。</p>
+<p>记录追加是一种变更，遵循3.1节的控制流，只主副本有些额外的控制逻辑。client把数据推送给文件最后一个块的所有副本，然后向主副本发送请求。主副本会检查如果追加这条记录会不会导致块超过最大尺寸（64MB）。如果超过，将快填充到最大尺寸，通知次级副本做同样的操作，然后回复client指出操作应该在下一个块重试。（记录追加限制在至多块最大尺寸的1&#x2F;4，这样保证最坏情况下数据碎片的数量仍然在可控的范围。）如果记录在最大尺寸以内，这也是通常情况，主副本服务器将数据追加到自己的副本，通知次级副本将数据写在它准确的位移上，最后回复client操作成功。</p>
+<p>如果记录追加在任何副本上失败，客户端重试操作。结果，同一个块的副本可能包含不同的数据，可能包括一个记录的全部或者部分重复。GFS并不保证所有副本在字节级别完全相同。它只保证数据作为一个原子单元的至少被写入一次。这个特性可以很容易地从简单观察中推断出来：操作如果要报告成功，数据一定已经写入到了一些块的所有副本的相同偏移上。并且，至此以后，所有副本至少都和记录尾部一样长，并且将来的记录会被分配到更高的偏移，或者不同的块，即之后一个不同的副本成为了主副本。就我们的一致性保障而言，记录追加操作成功写入数据的域是已定义的（因此也是一致的），然而中间域则是不一致的（因此也就是未定义的）。我们的程序可以像我们在2.7.2节讨论的那样处理不一致的域。</p>
+<h3 id="3-4-快照"><a href="#3-4-快照" class="headerlink" title="3.4 快照"></a>3.4 快照</h3><p>快照操作几乎会在瞬间对一个文件或一个目录树（被称为源）完成拷贝，同时能够尽可能少地打断正在执行的变更。我们的用户使用快照操作来快速地对一个庞大的数据集的一个分支进行拷贝（或对其拷贝再进行拷贝等等），或者在实验前对当前状态创建检查点，这样就可以在试验后轻松地提交或回滚变更。</p>
+<p>我们使用类似AFS的标准的写入时复制技术来实现快照。当master收到快照请求的时候，它首先会撤销快照涉及到的文件的chunk上所有未完成的租约。这确保了对这些chunk在后续的写入时都需要与master交互以查找租约的持有者。这会给master优先拷贝这些chunk的机会。</p>
+<p>在租约被收回或过期后，master会将快照操作记录到日志中，并写入到磁盘。随后，master会通过在内存中创建一个源文件或源目录树的元数据的副本的方式来进行快照操作。新创建的快照文件与源文件指向相同的chunk。</p>
+<p>在快照操作后，首次想要对chunk C 进行write操作的client会向master发送一个请求以找到当前的租约持有者。master会检测到chunk C 的引用数超过1个。master会推迟对client的响应，并选取一个新的chunk handler  C’ 。接着，master请求每个当前持有chunk C 副本的chunkserver去创建一个新chunk C’ 。通过在与源chunk相同的chunkserver上创建新chunk，可以保证数据只在本地拷贝，而不会通过网络拷贝（我们的磁盘大概比 100Mb 的以太网连接快3倍左右）。在这之后，请求的处理逻辑就与处理任何其他chunk的请求一样了：master向新chunk C’ 的一个副本授权租约并将其响应client的请求。这样，client就可以像平常一样对chunk进行write操作，且client并不知道这个chunk是刚刚从一个已有的chunk创建来的。</p>
+<h2 id="四、-Master的操作"><a href="#四、-Master的操作" class="headerlink" title="四、    Master的操作"></a>四、    Master的操作</h2><p>Master执行所有的命名空间操作。另外，它管理整个系统里的chunk副本：它制定部署策略，创建新的chunk也就是副本，协调各种系统级活动以保证chunk全面备份，在所有Chunkserver间平衡负载，回收闲置的存储空间。本节我们分别讨论这些主题。</p>
+<h3 id="4-1-命名空间管理和锁"><a href="#4-1-命名空间管理和锁" class="headerlink" title="4.1 命名空间管理和锁"></a>4.1 命名空间管理和锁</h3><p>许多master操作会花费很长时间：比如，快照操作必须取消被快照覆盖的所有块上的chunkserver租约。我们不想它们运行的时候耽搁其它master操作。因此，我们允许多个操作活跃，使用命名空间域上的锁来保证正确的串行化。</p>
+<p>不同于许多传统文件系统，GFS没有能够列出目录下所有文件的每目录数据结构。也不支持同一文件或者目录的别名（例如，Unix语境中的硬链接或者符号链接）。GFS将其命名空间逻辑上表现为全路径到元数据映射的查找表。利用前缀压缩，这个表可以在内存中高效展现。命名空间树中的每个节点（绝对文件名或绝对目录名）都有一个关联的读写锁。</p>
+<p>每个master操作在运行之前都获得一组锁。通常情况下，如果它涉及&#x2F;d1&#x2F;d2&#x2F;…&#x2F;dn&#x2F;leaf，它将获得目录名&#x2F;d1，&#x2F;d1&#x2F;d2，…，&#x2F;d1&#x2F;d2&#x2F;…&#x2F;dn上的读锁，以及全路径&#x2F;d1&#x2F;d2&#x2F;…&#x2F;dn&#x2F;leaf上的读锁或者写锁。注意，根据操作的不同，leaf可能是文件或者目录。</p>
+<p>现在我们演示一下在&#x2F;home&#x2F;user被快照到&#x2F;save&#x2F;user的时候，锁机制如何防止创建文件&#x2F;home&#x2F;user&#x2F;foo。快照操作获得&#x2F;home和&#x2F;save上的读锁，以及&#x2F;home&#x2F;user 和&#x2F;save&#x2F;user上的写锁。文件创建操作获得&#x2F;home和&#x2F;home&#x2F;user的读锁，以及&#x2F;home&#x2F;user&#x2F;foo的写锁。这两个操作将准确地串行，因为它们试图获取&#x2F;home&#x2F;user 上的冲突锁。文件创建不需要父目录的写锁，因为这里没有“目录”，或者类似内部节点的数据结构需要防止修改。文件名的读锁足以防止父目录被删除。</p>
+<p>这种锁机制的一个良好特性是支持对同一目录的并发变更。比如，可以在同一个目录下同时创建多个文件：每个都获得一个目录名的上的读锁和文件名上的写锁。目录名的读取锁足以防止目录被删除、改名以及被快照。文件名的写入锁序列化地尝试用同一个名字两次创建文件。</p>
+<p>因为命名空间可以有许多节点，读写锁对象采用惰性分配，一旦不再使用立刻被删除。同样，锁在一个一致性的全局顺序中获取来避免死锁：首先按命名空间树中的层次排序，同层按字典顺序排序。</p>
+<h3 id="4-2-副本的部署"><a href="#4-2-副本的部署" class="headerlink" title="4.2 副本的部署"></a>4.2 副本的部署</h3><p>GFS集群在多个层级上都高度分布。GFS通常有数百个跨多个机架的chunkserver。这些chunkserver可能会被来自相同或不同机架上的数百个clienet访问。在不同机架上的两台机器的通信可能会跨一个或多个交换机。另外，一个机架的出入带宽可能小于这个机架上所有机器的出入带宽之和。多层级的分布为数据的可伸缩性、可靠性和可用性带来了特有的挑战。</p>
+<p>chunk副本分配策略有两个目标：最大化数据可靠性和可用性、最大化网络带宽的利用。对于这两个目标，仅将副本分散在所有机器上是不够的，这样做只保证了容忍磁盘或机器故障且只充分利用了每台机器的网络带宽。我们必须在机架间分散chunk的副本。这样可以保证在一整个机架都被损坏或离线时（例如，由交换机、电源电路等共享资源问题引起的故障），chunk的一些副本仍存在并保持可用状态。除此之外，这样还使对chunk的流量（特别是读流量）能够充分利用多个机架的总带宽。而另一方面，写流量必须流经多个机架，这是我们资源做出的权衡。</p>
+<h3 id="4-3-chunk创建、重新备份、重均衡"><a href="#4-3-chunk创建、重新备份、重均衡" class="headerlink" title="4.3 chunk创建、重新备份、重均衡"></a>4.3 chunk创建、重新备份、重均衡</h3><p>chunk副本的创建可能由三个原因引起：chunk创建、重新备份和重均衡。</p>
+<p>当master创建一个chunk的时候，它会选择初始化空副本的位置。位置的选择会参考很多因素：（1）我们希望在磁盘利用率低于平均值的chunkserver上放置副本。随着时间推移，这样将平衡chunkserver间的磁盘利用率（2）我们希望限制每台chunkserver上最近创建的chunk的数量。尽管创建chunk本身开销很小，但是由于chunk时写入时创建的，且在我们的一次追加多次读取（append-once-read-many）的负载下chunk在写入完成后经常是只读的，所以master还要会可靠的预测即将到来的大量的写入流量。（3）对于以上讨论的因素，我们希望将chunk的副本跨机架分散。</p>
+<p>当chunk可用的副本数少于用户设定的目标值时，master会重新备份。chunk副本数减少可能有很多种原因，比如：chunkserver可能变得不可用、chunkserver报告其副本被损坏、chunkserver的磁盘因为错误变得不可用、或者目标副本数增加。每个需要重新备份的chunk会参考一些因素按照优先级排序。这些因素之一是当前chunk副本数与目标副本数之差。例如，我们给失去两个副本的chunk比仅失去一个副本的chunk更高的优先级。另外，我们更倾向于优先为还存在的文件的chunk重新备份，而不是优先为最近被删除的文件（见章节4.4）重做。最后，为了最小化故障对正在运行的应用程序的影响，我们提高了所有正在阻塞client进程的chunk的优先级。</p>
+<p>master选取优先级最高的chunk，并通过命令若干chunkserver直接从一个存在且合法的副本拷贝的方式来克隆这个chunk。新副本位置的选取与创建新chunk时位置选取的目标类似：均衡磁盘空间利用率、限制在单个chunkserver上活动的克隆操作数、在机架间分散副本。为了防止克隆操作的流量远高于client流量的情况发生，master需要对整个集群中活动的克隆操作数和每个chunkserver上活动的克隆操作数进行限制。除此之外，在克隆操作中，每个chunkserver还会限制对源chunkserver的读请求，以限制每个克隆操作占用的总带宽。</p>
+<p>最后，每隔一段时间master会对副本进行重均衡：master会检测当前的副本分布并移动副本位置，使磁盘空间和负载更加均衡。同样，在这个过程中，master会逐渐填充一个新的chunkserver，而不会立刻让来自新chunk的高负荷的写入流量压垮新的chunkserver。新副本放置位置的选择方法与我们上文中讨论过的类似。此外，master必须删除一个已有副本。通常，master会选择删除空闲磁盘空间低于平均的chunkserver上的副本，以均衡磁盘空间的使用。</p>
+<h3 id="4-4-垃圾回收"><a href="#4-4-垃圾回收" class="headerlink" title="4.4 垃圾回收"></a>4.4 垃圾回收</h3><p>GFS在文件删除后不会立刻回收可用的物理空间。这只在常规的文件及块级垃圾回收期间懒惰地进行。我们发现这个方法使系统更简单、更可靠。</p>
+<h4 id="4-4-1-机制"><a href="#4-4-1-机制" class="headerlink" title="4.4.1 机制"></a>4.4.1 机制</h4><p>当一个文件被应用程序删除时，master象对待其它变更一样立刻把删除操作录入日志。然而，与立即回收资源相反，文件只是被重命名为包含删除时间戳的隐藏的名字。在master对文件系统命名空间常规扫描期间，它会删除所有这种超过了三天的隐藏文件（这个时间间隔是可设置的）。在这之前，文件仍旧可以用新的特殊的名字读取，也可以通过重命名为普通文件名的方式恢复。当隐藏文件被从命名空间中删除，它的内存元数据被擦除。这有效地割断了它与所有块的连接。</p>
+<p>在类似的块命名空间常规扫描中，master识别孤立块（也就是对任何文件不可达的那些）并擦除那些块的元数据。在与master定期交换的心跳信息中，每个Chunkserver报告它拥有的块的子集，master回复识别出的已经不在master元数据中显示的所有块。Chunkserver可以任意删除这种块的副本。</p>
+<h4 id="4-4-2-讨论"><a href="#4-4-2-讨论" class="headerlink" title="4.4.2 讨论"></a>4.4.2 讨论</h4><p>虽然分布式垃圾回收在编程语言环境中是一个需要复杂的解决方案的难题，这在GFS中是相当简单的。我们可以轻易地识别块的所有引用：它们在master专有维护的文件-块映射中。我们也可以轻松识别所有块的副本：它们是每个Chunkserver指定目录下的Linux文件。所有这种master不识别的副本都是“垃圾”。</p>
+<p>垃圾回收方法对于空间回收相比迫切删除提供了一些优势。首先，在组件失效是常态的大规模分布式系统中其既简单又可靠。块创建可能在某些Chunkserver上成功在另一些上失败，留下了master不知道其存在的副本。副本删除消息可能丢失，master不得不记得重新发送失败的删除消息，不仅是自身的还有Chunkserver的。垃圾回收提供了一个统一的、可靠的清除无用副本的方法。第二，它将空间的回收合并到master常规后台活动中，比如，命名空间的常规扫描和与Chunkserver的握手等。因此，它批量执行，成本也被摊销。并且，它只在master相对空闲的时候进行。Master可以更快速地响应需要及时关注的client请求。第三，延缓空间回收为意外的、不可逆转的删除提供了安全网。</p>
+<p>根据我们的经验，主要缺点是，延迟有时会阻碍用户在存储空间紧缺时对微调使用做出的努力。重复创建和删除临时文件的应用程序不能立刻重用释放的空间。如果一个已删除的文件再次被明确删除，我们通过加速空间回收的方式解决这些问题。我们允许用户对命名空间的不同部分应用不同的备份和回收策略。例如，用户可以指定某些目录树内的文件中的所有块不备份存储，任何已删除的文件立刻不可恢复地从文件系统状态中移除。</p>
+<h3 id="4-5-过期副本检测"><a href="#4-5-过期副本检测" class="headerlink" title="4.5 过期副本检测"></a>4.5 过期副本检测</h3><p>如果Chunkserver失效或者漏掉它失效期间对块的变更，块副本可能成为过期副本。对每个chunk，master维护一个块版本号来区分最新副本和过期副本。</p>
+<p>每当master在一个块授权一个新的租约，它就增加chunk的版本号，然后通知最新的副本。Master和这些副本都把这个新的版本号记录在它们持久化状态中。这发生在任何client得到通知以前，因此也在对块开始写之前。如果另一个副本当前不可用，它的块版本号就不会被增长。当Chunkserver重新启动，并且向master报告它拥有的块子集以及它们相联系的版本号的时候，master会探测该Chunkserver是否有过期的副本。如果master看到一个比它记录的版本号更高的版本号，master假定它在授权租约的时候失败了，因此选择更高的版本号作为最新的。</p>
+<p>master在常规垃圾搜集中移除过期副本。在此之前，master在回复client的块信息请求的时候实际上认为过期副本根本不存在。作为另一种保护措施，在通知client哪个Chunkserver持有一个块的租约、或者在一个克隆操作中命令一个Chunkserver从另一个Chunkserver读取块时，master都包含了块的版本号。client或者Chunkserver在执行操作时都会验证版本号，因此它总是访问最新数据。</p>
+<h2 id="五、-容错和诊断"><a href="#五、-容错和诊断" class="headerlink" title="五、  容错和诊断"></a>五、  容错和诊断</h2><p>在我们设计GFS时，最大的挑战之一就是处理经常发生的设备故障。设备的质量和数量让故障发生不再是异常事件，而是经常发生的事。我们既无法完全信任机器，也无法完全信任磁盘。设备故障可能导致系统不可用，甚至会导致数据损坏。我们将讨论我们是如何应对这些挑战的，以及系统内建的用来诊断系统中发生的不可避免的问题的工具。</p>
+<h3 id="5-1-高可用"><a href="#5-1-高可用" class="headerlink" title="5.1 高可用"></a>5.1 高可用</h3><p>在GFS 集群的数百个服务器之中，在任意给定时间有些服务器必定不可用。我们用两条简单但是有效的策略保证整个系统的高可用性：快速恢复和副本。</p>
+<h4 id="5-1-1-快速恢复"><a href="#5-1-1-快速恢复" class="headerlink" title="5.1.1 快速恢复"></a>5.1.1 快速恢复</h4><p>在master和chunkserver的设计中，它们都会保存各自的状态，且无论它们以哪种方式终止运行，都可以在数秒内重新启动。事实上，我们并不区分正常终止和非正常的终止。通常，服务会直接被通过杀死进程的方式终止。当client和其他服务器的请求超时时，它们会在发生一个时间很短的故障，并随后重新连接到重启后的服务器并重试该请求。6.2.2节中有启动时间相关的报告。</p>
+<h4 id="5-1-2-chunk副本"><a href="#5-1-2-chunk副本" class="headerlink" title="5.1.2 chunk副本"></a>5.1.2 chunk副本</h4><p>正如之前讨论的，每个chunk会在不同机架的多个chunkserver上存有副本。用户可以为不同命名空间的文件制定不同的副本级别。副本级别默认为3。当有chunkserver下线或通过checksum校验和（见章节5.2）检测到损坏的副本时，master根据需求克隆现有的副本以保证每个chunk的副本数都是饱和的。尽管副本策略可以很好地满足我们的需求，我们还是探索了其他形式的跨服务器的冗余策略以满足我们日益増长的只读数据存储需求，如：奇偶校验码（parity code）或擦除码（erasure code）。因为我们的流量主要来自append和读操作，而不是小规模的随机写操作，所以我们希望在松散耦合的系统中，既有挑战性又要可管理地去实现这些复杂的冗余策略。</p>
+<h4 id="5-1-3-master副本"><a href="#5-1-3-master副本" class="headerlink" title="5.1.3 master副本"></a>5.1.3 master副本</h4><p>为了保证可靠性，master的状态同样有副本。master的操作日志和检查点被在多台机器上复制。只有当变更在被日志记录并被写入，master本地和所有master副本的磁盘中后，这个变更才被认为是已提交的。为了简单起见，一个master进程既要负责处理所有变更又要负责处理后台活动，如垃圾回收等从内部改变系统的活动。当master故障时，其几乎可以立刻重启。如果运行master进程的机器故障或其磁盘故障，在GFS之外的负责监控的基础架构会在其它持有master的操作日志副本的机器上启动一个新的master进程。client仅通过一个规范的命名来访问master结点（例如gfs-test），这个规范的命名是一个DNS别名，其可以在master重新被分配到另一台机器时被修改为目标机器。</p>
+<p>此外，“影子”master节点（“shadow” master）可以提供只读的文件系统访问，即使在主master结点脱机时它们也可以提供服务。因为这些服务器可能稍稍滞后于主master服务器（通常滞后几分之一秒），所以这些服务器是影子服务器而非镜像服务器。这些影子master服务器增强了那些非正在被变更的文件和不介意读到稍旧数据的应用程序的可用性。实际上，由于文件内容是从chunkserver上读取的，所以应用程序不会读取到陈旧的文件内容。能够在一个很短的时间窗口内被读取到的陈旧的数据只有文件元数据，如目录内容和访问控制信息。</p>
+<p>为了让自己的元数据跟随主master变化，影子master服务器会持续读取不断增长的操作日志副本，并像主master一样按照相同的顺序对其数据结构应用变更。像主master一样，影子master服务器也会在启动时从chunkserver拉取数据来获取chunk副本的位置（启动后便很少拉取数据），并频繁地与chunkserver交换握手信息来监控它们的状态。只有因主master决定创建或删除副本时，影子master服务器上的副本位置才取决于主master服务器。</p>
+<h3 id="5-2-数据完整性"><a href="#5-2-数据完整性" class="headerlink" title="5.2 数据完整性"></a>5.2 数据完整性</h3><p>每个chunkserver都使用校验和来检测存储的数据是否损坏。由于GFS集群通常在数百台机器上有数千chunk磁盘，所以集群中经常会出现磁盘故障，从而导致数据损坏或丢失（第七章中介绍了一个诱因）。我们可以通过chunk的其他副本来修复损坏的chunk，但不能通过比较chunkserver间的副本来检测chunk是否损坏。除此之外，即使内容不同的副本中的数据也可能都是合法的：GFS中变更的语义，特别是前文中讨论过的记录追加，不会保证副本完全相同。因此，每个chunkserver必须能够通过维护校验和的方式独立的验证副本中数据的完整性。</p>
+<p>一个chunk被划分为64KB的block。每个block有其对应的32位校验和。就像其他元数据一样，校验和也在内存中保存且会被通过日志的方式持久化存储。校验和与用户数据是分开存储的。</p>
+<p>对于读取操作，无论请求来自client还是其他chunkserver，chunkserver都会在返回任何数据前校验所有包含待读取数据的block的校验和。因此，chunkserver不会将损坏的数据传给其他机器。如果一个block中数据和记录中低的校验和不匹配，那么chunkserver会给请求者返回一个错误，并向master报告校验和不匹配。随后，请求者会从其他副本读取数据，而master会从该chunk的其他副本克隆这个chunk。当该chunk新的合法的副本被安置后，master会通知报告了校验和不匹配的chunkserver删除那份损坏的副本。</p>
+<p>校验和对读取性能的影响很小。因为我们的大部分读操作至少会读跨几个block的内容，我们只需要读取并校验相对少量的额外数据。GFS客户端代码通过尝试将读取的数据与需要校验的block边界对其的方式，进一步地减小了校验开销。除此之外，chunkserver上校验和的查找与比较不需要I&#x2F;O操作，且校验和计算操作经常与其他操作在I&#x2F;O上重叠，因此几乎不存在额外的I&#x2F;O开销。</p>
+<p>因为向chunk末尾append数据的操作在我们的工作负载中占主要地位，所以我们对这种写入场景的校验和计算做了大量优化。在append操作时，我们仅增量更新上一个block剩余部分的校验和，并为append的新block计算新校验和。即使最后一个block已经损坏且目前没被检测到，增量更新后的该block的新校验和也不会与block中存储的数据匹配。在下一次读取该block时，GFS会像往常一样检测到数据损坏。</p>
+<p>相反，如果write操作覆盖了一个chunk已存在的范围，那么我们必须读取并验证这个范围的头一个和最后一个block，再执行write操作，最后计算并记录新的校验和。如果我们没有在写入前校验头一个和最后一个block，新的校验和可能会掩盖这两个block中没被覆写的区域中存在的数据损坏问题。</p>
+<p>chunkserver可以在空闲期间扫描并验证非活动的chunk的内容。这样可以让我们检测到很少被读取的chunk中的数据损坏。一旦检测到数据损坏，master可以创建一个新的未损坏的副本并删除损坏的副本。这样可以防止master将chunk的非活动的但是已损坏的副本识别成数据合法的副本。</p>
+<h3 id="5-3-诊断工具"><a href="#5-3-诊断工具" class="headerlink" title="5.3 诊断工具"></a>5.3 诊断工具</h3><p>全面且详细的诊断日志以极小的开销为问题定位、调试和性能分析提供了很大的帮助。如果没有日志，理解机器间短暂且不重复的交互将变得非常困难。GFS服务器会生成用来记录重要事件（如chunkserver上线或离线）和所有RPC请求与响应的诊断日志。这些诊断日志可以随意删除，不会影响到系统正确性。不过，如果磁盘空间允许，我们将尽可能地保持这些日志。</p>
+<p>RPC日志包括通过网络收发的请求和响应中除读写的文件数据之外的详细内容。在诊断问题时，我们可以通过整合不同机器中的日志并将请求与响应匹配的方式，重建整个交互历史。同样，这些日志也可用来跟踪压力测试、性能分析等情况。</p>
+<p>因为日志是顺序且异步写入的，因此日志对性能的影响非常小，并带来了很大的好处。其中最近的事件也会在内存中保存，以便在持续的在线监控中使用。</p>
+<h2 id="六、-测量"><a href="#六、-测量" class="headerlink" title="六、   测量"></a>六、   测量</h2><p>在这一节中我们展示了一些微型基准测试，以说明在GFS架构和实现中的瓶颈。我们还将展示一些Google在现实场景中的集群使用时的一些指标。</p>
+<h3 id="6-1-微型基准测试"><a href="#6-1-微型基准测试" class="headerlink" title="6.1 微型基准测试"></a>6.1 微型基准测试</h3><p>我们在一个由1个master、2个master副本、16个chunkserver和16个client组成的GFS集群中测量性能表现。该配置的选择仅为了便于测试。通常一个GFS集群会由数百个chunkserver和数百个client组成。</p>
+<p>所有的机器都采用双核1.4GHz的奔腾III处理器、2GB内存、两块5400转的80GB磁盘和100Mbpc全双工以太网，并连接到一台HP2524交换机。其中所有的19台GFS服务器都连接到同一台交换机，所有的16台client机器都连接到另一台交换机。这两个交换机之间通过1Gbps连接。</p>
+<h4 id="6-1-1-读取"><a href="#6-1-1-读取" class="headerlink" title="6.1.1 读取"></a><em>6.1.1 读取</em></h4><p>N个client同时从GFS读取数据。每个client从320GB的数据集中随机选取4MB的区域读取。读操作将重复256次，即每个client最终将读取1GB的数据。chunkserver总计有32GB内存，因此我们预测读操作中最多10%命中Linux缓冲区缓存。我们的测试结果应该接近冷缓存的结果。</p>
+<p><img src="/2022/08/31/The-Google-File-System/figure03.JPG" alt="总吞吐量" title="总吞吐量"></p>
+<p><strong>图3：总吞吐量。</strong> 上面的曲线表示在网络拓扑中的理论极限。下面的曲线表示测量到的吞吐量。测量结果曲线显示了95%置信区间的误差柱，在一些情况下，由于测量值的方差很低，置信区间在图中难以辨认。</p>
+<p>图3(a)展示了N个client的总读取速率和理论速率上限。整体的理论速率在125MB&#x2F;s时达到峰值，此时两个交换机间的1Gbps的链路达到饱和；或者每个client的理论速率在12.5MB&#x2F;s时达到峰值，此时它的100Mbps的网络接口达到饱和。当仅有一台client在读取时，我们观测到其读取速率为10MB&#x2F;s，在每台client理论上限的80%。当16个client一起读取时，总读取速率达到了94MB&#x2F;s，大致达到了理论上限125MB&#x2F;s的75%，平均每个client的读取速率为6MB&#x2F;s。因为reader的数量增加导致多个reader从同一个chunkserver读取的概率增加，所以读取速率从理论值的80%下降到了75%。</p>
+<h4 id="6-1-2-写入"><a href="#6-1-2-写入" class="headerlink" title="6.1.2 写入"></a><em>6.1.2 写入</em></h4><p>N个client同时向N个不同的文件写入。每个client通过一系列的1MB的写操作向一个新文件写入总计1GB数据。图3(b)展示了整体的写入速率和理论速率上限。整体的理论写入速率上限为67MB&#x2F;s，因为我们需要将每个字节写入16个chunkserver中的三个，每个chunkserver的连接输入速率为12.5MB&#x2F;s。</p>
+<p>每个client的写入速率为6.3MB&#x2F;s，大概是上限的一半。网络栈是造成这一现象的罪魁祸首。在我们使用流水线的方式将数据推送到chunk副本时，网络栈的表现不是很好。数据从一个副本传递给另一个副本的时延降低了整体的写入速率。</p>
+<p>16个client的整体写入速率达到了35MB&#x2F;s，大概是理论上限的一半。在读取的情况下，当client的数量增加时，更有可能出现多个client并发地向同一个chunkserver写入的情况。此外，因为write操作需要向3份不同的副本写入，所以16个writer比16个reader更有可能出现碰撞的情况。</p>
+<p>write操作比我们预想的要慢。但是在实际环境中，这并不是主要问题。即使它增加了单个client的时延，但是在有大量client的情况下它并没有显著影响系统的整体写入带宽。</p>
+<h4 id="6-1-3-记录追加"><a href="#6-1-3-记录追加" class="headerlink" title="6.1.3 记录追加"></a><em>6.1.3 记录追加</em></h4><p>图3(c)展示了记录追加操作的性能表现。N个client同时向同一个文件追加数据。其性能受存储该文件最后一个chunk的chunkserver的网络带宽限制，与client的数量无关。当仅有1个client时，记录追加的速率为6.0MB&#x2F;s，当client的数量增加到16个时，速率下降到4.8MB&#x2F;s。网络拥塞和不同client的网络传输速率不同是造成记录追加速率下降的主要原因。</p>
+<p>在实际环境中，我们的应用程序往往会并发地向多个这样的文件追加数据。换句话说，即N个client同时地向M个共享的文件追加数据，其中N与M均为数十或数百。因此，实验中出现的chunkserver的网络拥塞在实际环境中并不是大问题，因个client可以在chunkserver忙着处理一个文件时向另一个文件写入数据。</p>
+<h3 id="6-2-现实场景中的集群"><a href="#6-2-现实场景中的集群" class="headerlink" title="6.2 现实场景中的集群"></a>6.2 现实场景中的集群</h3><p>现在我们来考察在Google中使用的两个集群，它们代表了其他类似的集群。集群A是数百个工程师常用来研究或开发的集群。其中典型的任务由人启动并运行几个小时。这些任务会读几MB到几TB的数据，对其分析处理，并将结果写回到集群中。集群B主要用于生产数据的处理。其中的任务持续时间更长，会不断地生成数TB的数据集，且偶尔才会有人工干预。在这两种情况中，每个任务都由许多进程组成，这些进程包括许多机器对许多文件同时的读写操作。</p>
+<p><img src="/2022/08/31/The-Google-File-System/table02.JPG" alt="两个GFS集群的特征" title="两个GFS集群的特征"></p>
+<p><strong>表2： 两个GFS集群的特征</strong></p>
+<h4 id="6-2-1-存储"><a href="#6-2-1-存储" class="headerlink" title="6.2.1 存储"></a><em>6.2.1 存储</em></h4><p>正如表中前5个条目所示，两个集群都有数百个chunkserver，有数TB的磁盘存储空间，且大部分存储空间都被使用，但还没满。其中“已使用空间”包括所有chunk的副本占用的空间。几乎所有文件都以3份副本存储。因此，集群分别存储了18TB和52TB的数据。</p>
+<p>这两个集群中的文件数相似，但集群B中停用文件（dead file）比例更大。停用文件即为被删除或被新副本替换后还未被回收其存储空间的文件。同样，集群B中chunk数量更多，因为其中文件一般更大。</p>
+<h4 id="6-2-2-元数据"><a href="#6-2-2-元数据" class="headerlink" title="6.2.2 元数据"></a><em>6.2.2 元数据</em></h4><p>在chunkserver中，总共存储了数十GB的元数据，其中大部分是用户数据的每64KB大小的block的校验和。除此之外，chunkserver中的保存元数据只有4.5节中讨论的chunk版本号。</p>
+<p>保存在master上的元数据小的多，只有数十MB，或者说平均每个文件100 字节。这和我们设想的是一样的，实际中master的内存大小并不限制系统容量。大部分的文件元数据是文件名，我们对其采用前缀压缩的形式存储。其他的文件元数据包括文件所有权和权限、文件到chunk的映射、每个chunk当前的版本号。除此之外，我们还存储了chunk当前的副本位置和chunk的引用计数（以实现写入时拷贝等）。</p>
+<p>无论是chunkserver还是master，每个服务器中仅有50MB到100MB元数据。因此，服务器恢复的速度很快。服务器只需要几秒钟的时间从磁盘读取元数据，随后就能应答查询请求。然而，master的恢复稍微有些慢，其通常需要30到60秒才能恢复，因为master需要从所有的chunkserver获取chunk的位置信息。</p>
+<h4 id="6-2-3-读写速率"><a href="#6-2-3-读写速率" class="headerlink" title="6.2.3 读写速率"></a><em>6.2.3 读写速率</em></h4><p>表3展示了不同时间段的读写速率。两个集群在测量开始后均运行了大概一周的时间。（集群最近已因升级到新版本的GFS而重启过。）</p>
+<p><img src="/2022/08/31/The-Google-File-System/table03.JPG" alt="两个GFS集群的性能指标" title="两个GFS集群的性能指标"></p>
+<p><strong>表3： 两个GFS集群的性能指标</strong></p>
+<p>从重启后，集群的平均写入速率小于30MB&#x2F;s。当我们测量时，集群B正在执行以大概100MB&#x2F;s写入生成的数据的活动，因为需要将数据传递给三份副本，该活动造成了300MB&#x2F;s的网络负载。</p>
+<p>读操作的速率比写操作的速率要高得多。正如我们假设的那样，整体负载主要有读操作组成而非写操作。在测量时两个集群都在执行高负荷的读操作。实际上，集群A已经维持580MB&#x2F;s的读操作一周了。集群A的网络配置能够支持750MB&#x2F;s的读操作，所以集群A在高效利用其资源。集群B能够支持峰值在1300MB&#x2F;s的读操作，但集群B的应用程序仅使用了380MB&#x2F;s。</p>
+<h4 id="6-2-4-master负载"><a href="#6-2-4-master负载" class="headerlink" title="6.2.4 master负载"></a><em>6.2.4 master负载</em></h4><p>表3中还展示了向master发送操作指令的速率，该速率大概在每秒200到500次左右。master可以在该速率下轻松地工作，因此这不会成为负载的瓶颈。</p>
+<p>GFS在早期版本中，在某些负载场景下，master偶尔会成为瓶颈。当时master会消耗大量的时间来扫描包含成百上千个文件的目录以寻找指定文件。在那之后，我们修改了master中的数据结构，允许其通过二分查找的方式高效地搜索命名空间。目前，master已经可以轻松地支持每秒上千次的文件访问。如果有必要，我们还可以通过在命名空间数据结构前放置名称缓存的方式进一步加快速度。</p>
+<h4 id="6-2-5-恢复时间"><a href="#6-2-5-恢复时间" class="headerlink" title="6.2.5 恢复时间"></a><em>6.2.5 恢复时间</em></h4><p>当chunkserver故障后，一些chunk的副本数会变得不饱和，系统必须克隆这些块的副本以使副本数重新饱和。恢复所有chunk需要的时间取决于资源的数量。在一次实验中，我们杀掉集群B中的一个chunkserver。该chunkserver上有大概15000个chunk，总计约600GB的数据。为了限制重分配副本对正在运行的应用程序的影响并提供更灵活的调度策略，我们的默认参数限制了集群中只能有91个并发的克隆操作（该值为集群中chunkserver数量的40%）。其中，每个克隆操作的速率上限为6.25MB&#x2F;s（50Mbps）。所有的chunk在23.2分钟内完成恢复，有效地复制速率为440MB&#x2F;s。</p>
+<p>在另一个实验中，我们杀掉了两台均包含16000个chunk和660GB数据的chunkserver。这两个chunkserver的故障导致了266个chunk仅剩一分副本。这266个块在克隆时有着更高的优先级，在2分钟内即恢复到至少两份副本的状态，此时可以保证集群中即使再有一台chunkserver故障也不会发生数据丢失。</p>
+<h3 id="6-3-工作负载分解"><a href="#6-3-工作负载分解" class="headerlink" title="6.3 工作负载分解"></a>6.3 工作负载分解</h3><p>在本节中，我们将详细介绍两个GFS集群中的工作负载。这两个集群与6.2节中的类似但并不完全相同。集群X用来研究和开发，集群Y用来处理生产数据。</p>
+<h4 id="6-3-1-方法论及注意事项"><a href="#6-3-1-方法论及注意事项" class="headerlink" title="6.3.1 方法论及注意事项"></a><em>6.3.1 方法论及注意事项</em></h4><p>这些实验结果仅包含来自client的请求，因此结果反映了我们的应用程序为整个文件系统带来的负载情况。结果中不包括用来处理client请求的内部请求和内部的后台活动，如chunkserver间传递write数据和副本重分配等。</p>
+<p>I&#x2F;O操作的统计数据来源于GFS通过RPC请求日志启发式重构得到的信息。例如，GFS的client代码可能将一个read操作分解为多个RPC请求以提高并行性，通过日志启发式重构后，我们可以推断出原read操作。因为我们的访问模式是高度一致化的，所以我们期望的错误都在数据噪声中。应用程序中显式的日志可能会提供更加准确的数据，但是重新编译并重启上千个正在运行的client是不现实的，且从上千台机器上采集数据结果也非常困难。</p>
+<p>需要注意的一点是，不要过度地概括我们的负载情况。因为Google对GFS和它的应用程序具有绝对的控制权，所以应用程序会面向GFS优化，而GFS也正是为这些应用程序设计的。虽然这种应用程序与文件系统间的互相影响在一般情况下也存在，但是这种影响在我们的例子中可能会更明显。</p>
+<h4 id="6-3-2-chunkserver的工作负载"><a href="#6-3-2-chunkserver的工作负载" class="headerlink" title="6.3.2 chunkserver的工作负载"></a><em>6.3.2 chunkserver的工作负载</em></h4><p>表4展示了各种大小的操作占比。读操作的大小呈双峰分布。小规模read（64KB以下）来自client从大文件查找小片数据的seek密集操作。大规模read（超过512KB）来自读取整个文件的线性读取。</p>
+<p><img src="/2022/08/31/The-Google-File-System/table04.JPG" alt="各种大小的操作占比" title="各种大小的操作占比"></p>
+<p><strong>表4： 各种大小的操作占比（%）。</strong> 对于read操作，数据大小为实际读取和传输的数据大小，而非请求读取的总大小。</p>
+<p>在集群Y中，大量的read没有返回任何数据。在我们的应用程序中（特别是生产系统中的应用程序），经常将文件作为生产者-消费者队列使用。在多个生产者并发地向同一个文件支架数据的同时，会有一个消费者读末尾的数据。偶尔当消费者超过生产者时，read即不会返回数据。集群X中这种情况出现的较少，因为在集群X中的应用程序通常为短期运行的数据分析程序，而非长期运行的分布式应用程序。</p>
+<p>write也呈同样的双峰分布。大规模write（超过256KB）通常是由writer中的大量的缓冲区造成的。小规模write（小于64KB）通常来自于那些缓冲区小、创建检查点操作或者同步操作更频繁、或者是仅生成少量数据的writer。</p>
+<p>对于记录追加操作，集群Y中大规模的记录追加操作比集群X中要高很多。因为我们的生产系统使用了集群Y，生产系统的应用程序会更激进地面向GFS优化。</p>
+<p>表5中展示了不同大小的操作中传输数据的总量的占比。对于所有类型的操作，大规模操作（超过256KB）通常都是字节传输导致的。小规模read（小于64KB）操作通常来自seek操作，这些读操作传输了很小但很重要的数据。</p>
+<p><img src="/2022/08/31/The-Google-File-System/table05.JPG" alt="各种大小的操作字节传输量占比" title="各种大小的操作字节传输量占比"></p>
+<p><strong>表5： 各种大小的操作字节传输量占比（%）。</strong> 对于read操作，数据大小为实际读取和传输的数据大小，而非请求读取的总大小。二者的区别为，读取请求可能会试图读取超过文件末尾的内容。在我们的设计中，这不是常见的负载。</p>
+<h4 id="6-3-3-追加-VS-写入"><a href="#6-3-3-追加-VS-写入" class="headerlink" title="6.3.3 追加 VS 写入"></a><em>6.3.3 追加 VS 写入</em></h4><p>记录追加操作尤其在我们生产系统中使用频繁。对于集群X，按照传输的字节数写操作和记录追加的比率是108:1，按照操作次数比是8:1。对于用于我们生产系统的集群Y，比率分别是3.7:1和2.5:1。并且，这一比率说明对于这两个集群，记录追加倾向于比写操作大。然而对于集群X，在测量期间记录追加的整体使用相当低，因此结果可能可能被一两个使用特定大小的缓冲区选择的应用程序造成偏移。</p>
+<p>不出所料，我们的数据变更负载主要被记录追加占据而不是重写。我们测量了在主副本上的重写数据量。这近似于一个client故意重写之前写过的数据，而不是增加新的数据。对于集群X，重写的量低于字节变更的0.0001%，低于变更操作的0.0003%。对于集群Y，这两个比率都是0.05%。虽然这很微小，但是仍然高于我们的预期。这证明了，大多数重写来自由于错误或超时引起的客户端重试。这在不算工作负载本身的一部分，而是重试机制的结果。</p>
+<h4 id="6-3-4-master的工作负载"><a href="#6-3-4-master的工作负载" class="headerlink" title="6.3.4 master的工作负载"></a><em>6.3.4 master的工作负载</em></h4><p>表6展示了对master的各种类型的请求占比。其中，大部分请求来自read操作询问chunk位置的请求（FindLocation）和数据变更操作询问租约持有者（FindLeaseLocker）。</p>
+<p>集群X与集群Y中Delete请求量差异很大，因为集群Y存储被经常重新生成或者移动的生产数据。一些Delete请求量的差异还隐藏在Open请求中，因为打开并从头写入文件时（Unix中以“w”模式打开文件），会隐式地删除旧版本的文件。</p>
+<p>FindMatchingFiles是用来支持“ls”或类似文件系统操作的模式匹配请求。不像给master的其他请求，FindMatchingFiles请求可能处理很大一部分命名空间，因此这种请求开销很高。在集群Y中，这种请求更加频繁，因为自动化的数据处理任务常通过检查部分文件系统的方式来了解应用程序的全局状态。相反，使用集群X的应用程序会被用户更明确地控制，通常会提交知道所需的文件名。</p>
+<p><img src="/2022/08/31/The-Google-File-System/table06.JPG" alt="master请求类型占比" title="master请求类型占比"></p>
+<p><strong>表6： master请求类型占比（%）。</strong></p>
+<h2 id="七、-经验"><a href="#七、-经验" class="headerlink" title="七、   经验"></a>七、   经验</h2><p>在构建和部署GFS 的过程中，我们经历了各种各样的问题，有些是操作上的，有些是技术上的。</p>
+<p>起初，GFS 被设想为我们的生产系统的后端文件系统。随着时间推移，使用涉及了研究和开发任务。开始对许可和配额这类工作有很少的支持，但是现在包含了这些工作的基本形式。虽然生产系统是条理可控的，用户有时却不是。需要更多的基础设施来防止用户互相干扰。</p>
+<p>我们最大的问题是磁盘以及和Linux相关的问题。很多磁盘声称拥有支持某个范围内的IDE协议版本的Linux驱动，但是实际中反映出，只可靠地支持最新的。因为协议版本非常类似，这些磁盘大都可用，但是偶尔失配会导致驱动和内核对于驱动状态意见不一致。这会导致因为内核中的问题而默默地损坏数据。这个问题激励了我们使用checksum来探测数据损坏，然而同时我们修改内核来处理这些协议失配。</p>
+<p>早期我们在用Linux 2.2内核时有些问题，起因于fsync()的开销。它的开销与文件的大小而不是文件修改部分的大小成比例。这对我们的大型操作日志来说是一个问题，尤其是在我们实现检查点之前。我们花了不少时间用同步写来解决这个问题，但是最后还是移植到了Linux2.4内核上。</p>
+<p>另一个和Linux问题是单个读写锁问题，在一个地址空间的任意线程在从磁盘读进页（读锁）的时候都必须持有锁，或者在mmap()调用（写锁）的时候修改地址空间。在轻负载下的系统中我们发现短暂超时，然后卖力寻找资源瓶颈或者零星硬件错误。最终我们发现在磁盘线程置换之前映射数据的页时，单独锁阻塞了主网络线程把新数据映射到内存。因为我们主要受限于网络接口而不是内存复制带宽，我们以多一次复制为代价，用pread()替代mmap()的方式来解决这个问题。</p>
+<p>除了偶然的问题，Linux代码的可用性为我们节省了时间，并且再一次探究和理解系统的行为。适当的时候，我们改进内核并且和开源代码社区共享这些改动。</p>
+<h2 id="八、-相关工作"><a href="#八、-相关工作" class="headerlink" title="八、   相关工作"></a>八、   相关工作</h2><p>类似诸如AFS的其它大型分布式文件系统，GFS提供了一个与位置无关的命名空间，这使得数据可以为均衡负载或者容错透明地移动数据。不同于AFS 的是，GFS把文件数据分布到存储服务器，一种更类似Xfs和Swift的方式，这是为了实现整体性能和提高容错能力。</p>
+<p>由于磁盘相对便宜，并且复制比更复杂的RAID方法简单的多，GFS当前只使用备份进行冗余，因此要比xFS或者Swift花费更多的原始数据存储。</p>
+<p>与AFS、xFS、Frangipani以及Intermezzo系统相比，GFS并没有在文件系统层面提供任何缓存机制。我们的目标工作负载在单个应用程序运行内部几乎不会重复使用，因为它们或者是流式的读取一个大型数据集，要么是在其中随机搜索，每次读取少量的数据。</p>
+<p>某些分布式文件系统，比如Frangipani、xFS、Minnesota’s GFS、GPFS，去掉了中心服务器，依赖分布式算法保证一致性和可管理性。我们选择中心化的方法，目的是简化设计，增加可靠性，获得灵活性。特别的是，由于master已经拥有大多数相关信息，并且控制着它的改变，中心master使实现复杂的块部署和备份策略更简单。我们通过保持小型的master状态和在其它机器上对状态全复制的方式处理容错。扩展性和高可用性（对于读取）当前通过我们的影子master机制提供。对master状态的更新通过向预写日志追加的方式持久化。因此，我们可以适应类似Harp中主复制机制，从而提供比我们当前机制更强一致性保证的高可用性。</p>
+<p>我们在对大量用户实现整体性能方面类似于Lustre处理问题。然而，我们通过关注我们应用的需求，而不是建立一个兼容POSIX的文件系统的方式，显著地简化了这个问题。此外，GFS假定了大量不可靠组件，因此容错是我们设计的核心。</p>
+<p>GFS很类似NASD架构。虽然NASD架构是基于网络附属磁盘驱动的，GFS使用日常机器作为chunkserver，就像NASD原形中做的那样。与NASD工作不同的是，我们的Chunkserver使用惰性分配固定大小的块，而不是分配变长对象。此外，GFS实现了诸如重新平衡负载、备份、恢复等在生产环境中需要的特性。</p>
+<p>不同于与Minnesota’s GFS和NASD，我们并不谋求改变存储设备模型。我们关注使用现存日常组件的复杂分布式系统的日常数据处理需求。</p>
+<p>原子记录追加实现的生产者-消费者队列解决了类似River中分布式队列的问题。River使用跨机器分布、基于内存的队列，小心的数据流控制；然而GFS 使用可以被许多生产者并发追加记录的持久化文件。River模型支持m到n 的分布式队列，但是缺少伴随持久化存储的容错机制，然而GFS只高效地支持m到1的队列。多个消费者可以读取同一个文件，但是它们必须调整划分将来的负载。</p>
+<h2 id="九、-结论"><a href="#九、-结论" class="headerlink" title="九、   结论"></a>九、   结论</h2><p>Google文件系统展示了在日常硬件上支持大规模数据处理工作负载必需的品质。虽然一些设计决策是针对独特设置指定的，许多决策可能应用到相似数量级和成本意识的数据处理任务中。</p>
+<p>首先，我们根据我们当前和预期的工作负载和技术环境重新检查传统文件系统的假设。我们的观测在设计领域导致了根本不同的观点。我们将组件失效看作是常态而不是例外，优化通常先被追加（可能并发）然后再读取（通常序列化读取）的大文件，以及既扩展又放松标准文件系统接口来改进整个系统。</p>
+<p>我们的系统通过持续监控，备份关键数据，快速和自动恢复的方式容错。chunk副本使得我们可以容忍chunkserver失效。这些失效的频率激发了一种新奇的在线修复机制，定期透明地修复受损数据，尽快补偿丢失副本。此外，我们使用检验和在磁盘或者IDE子系统级别探测数据损坏，考虑到系统中磁盘的数量，这些情况是很常见的。</p>
+<p>我们的设计对大量并发的执行各种任务的reader和writer实现了高合计吞吐量。我们通过将文件系统控制与数据传输分离实现这个目标，控制经过master，数据传输直接在chunkserver和客户机之间穿行。Master与一般操作的牵连被大块尺寸和块租约最小化，块租约对主副本进行数据变更授权。这使得一个简单、中心化的master不变成瓶颈有了可能。我们相信在网络协议栈上的改进可以提升个别客户端经历的写吞吐量限制。</p>
+<p>GFS成功满足了我们的存储需求，并且在Google内部作为存储平台，无论是用于研究和开发，还是作为生产数据处理，都得到了广泛应用。它是使我们持续创新和解决整个WEB范围内的难题的一个重要工具。</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2023/03/26/hello-world/" data-id="clfou6xcm0003gjoihq6b7ip1" data-title="Hello World" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/08/31/The-Google-File-System/" data-id="clfourow20003idoicraoe6hd" data-title="The Google File System" class="article-share-link">Share</a>
       
       
       
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/big-data/" rel="tag">big data</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li></ul>
+
     </footer>
   </div>
   
@@ -165,7 +466,7 @@
     <article id="post-MapReduce-Simplified-Data-Processing-on-Large-Clusters" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/" class="article-date">
-  <time class="dt-published" datetime="2022-08-01T10:10:00.000Z" itemprop="datePublished">2022-08-01</time>
+  <time class="dt-published" datetime="2022-08-01T02:10:00.000Z" itemprop="datePublished">2022-08-01</time>
 </a>
     
   </div>
@@ -343,7 +644,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/" data-id="clfou6xcd0000gjoi8llcg6z3" data-title="MapReduce: Simplified Data Processing on Large Clusters" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/" data-id="clfourovt0000idoi7b395pe9" data-title="MapReduce: Simplified Data Processing on Large Clusters" class="article-share-link">Share</a>
       
       
       
@@ -364,13 +665,20 @@
           <aside id="sidebar">
   
     
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/">Course</a><ul class="category-list-child"><li class="category-list-item"><a class="category-list-link" href="/categories/Course/Paper/">Paper</a></li></ul></li></ul>
+    </div>
+  </div>
+
 
   
     
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/big-data/" rel="tag">big data</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/big-data/" rel="tag">big data</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/distributed-system/" rel="tag">distributed system</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/virtual-machine/" rel="tag">virtual machine</a></li></ul>
     </div>
   </div>
 
@@ -380,7 +688,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/big-data/" style="font-size: 10px;">big data</a> <a href="/tags/distributed-system/" style="font-size: 10px;">distributed system</a>
+      <a href="/tags/big-data/" style="font-size: 15px;">big data</a> <a href="/tags/distributed-system/" style="font-size: 20px;">distributed system</a> <a href="/tags/virtual-machine/" style="font-size: 10px;">virtual machine</a>
     </div>
   </div>
 
@@ -389,7 +697,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Archives</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">March 2023</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">August 2022</a></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">October 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">September 2022</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">August 2022</a></li></ul>
     </div>
   </div>
 
@@ -402,11 +710,11 @@
       <ul>
         
           <li>
-            <a href="/2023/03/26/The-Google-File-System/">The Google File System</a>
+            <a href="/2022/09/30/The-Design-of-a-Practical-System-for-Fault-Tolerant-Virtual-Machines/">The Design for a Practical System for Fault-Tolerant Virtual Machines</a>
           </li>
         
           <li>
-            <a href="/2023/03/26/hello-world/">Hello World</a>
+            <a href="/2022/08/31/The-Google-File-System/">The Google File System</a>
           </li>
         
           <li>
