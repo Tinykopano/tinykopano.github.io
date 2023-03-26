@@ -15,12 +15,12 @@
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure01.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure01.JPG">
-<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure02.JPG">
-<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure03.JPG">
-<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/figure04.JPG">
-<meta property="og:image" content="https://tinykopano.github.io/assets/img/posts/20220801/table01.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure02.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure03.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure04.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/table01.JPG">
 <meta property="article:published_time" content="2022-08-01T10:10:00.000Z">
-<meta property="article:modified_time" content="2023-03-26T03:15:13.564Z">
+<meta property="article:modified_time" content="2023-03-26T03:24:33.003Z">
 <meta property="article:author" content="KoPaNo">
 <meta property="article:tag" content="distributed system">
 <meta property="article:tag" content="big data">
@@ -208,7 +208,7 @@
 <h3 id="5-1-集群配置"><a href="#5-1-集群配置" class="headerlink" title="5.1 集群配置"></a>5.1 集群配置</h3><p>所有的程序运行在一个由将近1800台机器组成的集群上。每个机器有两个2GHz、支持超线程的Intel Xeon处理器、4GB的内存、两个160GB的IDE磁盘和一个1Gbps的以太网链路，这些机器部署在一个两层的树状交换网络中，在根节点处有大约100-200Gbps的带宽。所有的机器都采用相同的部署，因此任意两个机器间的RTT都小于1ms。</p>
 <p>在4GB内存里，有接近1-1.5GB用于运行在集群上的其它任务。程序在一个周末的下午开始执行，这时主机的CPU、磁盘和网络基本都是空闲的。</p>
 <h3 id="5-2-字符串查找（Grep）"><a href="#5-2-字符串查找（Grep）" class="headerlink" title="5.2 字符串查找（Grep）"></a>5.2 字符串查找（Grep）</h3><p>这个grep程序扫描了大概1010个100字节大小的记录，查找出现概率相对较小的3个字符的模式（这个模式出现在92337个记录中）。输入被分割成接近64MB的片（M&#x3D;15000），整个输出被放到一个文件中（R&#x3D;1）。</p>
-<p><img src="/assets/img/posts/20220801/figure02.JPG" alt="数据传输速率" title="数据传输速率"></p>
+<p><img src="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure02.JPG" alt="数据传输速率" title="数据传输速率"></p>
 <div style="text-align: center;"><b>图2</b>：数据传输速率</div>
 
 <p>图2显示了计算随时间的进展情况。Y轴显示了输入数据的扫描速率，这个速率会随着MapReduce计算的机器数量的增长而增长，当1764个工作进程参与计算时，总的速率超过30GB&#x2F;s。随着map任务的完成，速率开始下降，并在计算的大约第80秒变为0，整个计算从开始到结束大约持续了150秒，这包含了大约1分钟的启动时间开销，这个开销是由将程序传播到所有工作机器的时间、等待GFS文件系统打开1000个输入文件集的时间和获取位置优化所需信息的时间造成的。</p>
@@ -216,7 +216,7 @@
 <p>排序程序由不到50行的用户代码组成，一个三行的Map函数从一个文本行中抽取出一个10字节的key，并将这个key和原始的文本行作为中间的key&#x2F;value对进行输出。我们使用内置的Identity函数作为Reduce操作。这个函数将中间key&#x2F;value对不做任何修改的输出，最终排序结果输出到两路复制的GFS文件中（如，该程序输出了2TB的数据）。</p>
 <p>如前所述，输入数据被分割为64MB大小的片（M&#x3D;15000），将输出结果分成4000个文件（R&#x3D;4000）。分区函数使用了key的开头字符将数据分隔到R片中的一个。</p>
 <p>这个基准测试的分区函数内置了key的分区信息。在一个普通的排序程序中，我们将增加一个预处理MapReduce操作，它能够对key进行抽样，通过key的抽样分布来计算最终排序处理的分割点。</p>
-<p><img src="/assets/img/posts/20220801/figure03.JPG" alt="排序程序" title="排序程序"></p>
+<p><img src="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure03.JPG" alt="排序程序" title="排序程序"></p>
 <div style="text-align: center;"><b>图3</b>：对于排序程序的不同执行过程随时间的数据传输速率</div>
 
 <p>图3（a）显示了排序程序的正常执行过程。左上方的图显示了输入读取的速率，这个速率峰值大约为13GB&#x2F;s，因为所有的map任务执行完成，速率也在200秒前下降到了0。注意，这里的输入速率比字符串查找的要小，这是因为排序程序的map任务花费了大约一半的处理时间和I&#x2F;O带宽将终结结果输出到它们的本地磁盘上，字符串查找相应的中间结果输出几乎可以忽略。</p>
@@ -234,11 +234,11 @@
 <li>从大量新应用和新产品的网页中抽取特性（如，从大量的位置查询页面中抽取地理位置信息）</li>
 <li>大规模图形计算</li>
 </ul>
-<p><img src="/assets/img/posts/20220801/figure04.JPG" alt="实例" title="实例"></p>
+<p><img src="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/figure04.JPG" alt="实例" title="实例"></p>
 <div style="text-align: center;"><b>图4</b>：随时间变化的MapReduce实例</div>
 
 <p>图4中显示了在我们的源码管理系统中，随着时间的推移，MapReduce程序的数量有明显的增加，从2003年早期的0增加到2004年9月时的900个独立的实例。MapReduce如此的成功，因为它使利用半个小时编写的一个简单程序能够高效的运行在一千台机器上成为可能，这极大的加快了开发和原型设计的周期。此外，它允许没有分布式和&#x2F;或并行系统经验的开发者能够利用这些资源开发出分布式应用。</p>
-<p><img src="/assets/img/posts/20220801/table01.JPG" alt="任务" title="任务"></p>
+<p><img src="/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/table01.JPG" alt="任务" title="任务"></p>
 <div style="text-align: center;"><b>表1</b>： 2004年8月运行的MapReduce任务</div>
 
 <p>在每个工作的最后，MapReduce库统计了工作使用的计算资源。在表1中，我们看到一些2004年8月在Google内部运行的MapReduce工作的一些统计数据。</p>
@@ -263,7 +263,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/" data-id="clfotuzvv0000h3owbxjchje7" data-title="MapReduce: Simplified Data Processing on Large Clusters" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/08/01/MapReduce-Simplified-Data-Processing-on-Large-Clusters/" data-id="clfou6xcd0000gjoi8llcg6z3" data-title="MapReduce: Simplified Data Processing on Large Clusters" class="article-share-link">Share</a>
       
       
       
