@@ -6,12 +6,12 @@
   
   <title>In Search of an Understandable Consensus Algorithm (Extended Version) | KoPaNo&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="寻找一种可理解的共识算法摘要Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明，Ra">
+  <meta name="description" content="寻找一种可理解的共识算法摘要Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如leader、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明">
 <meta property="og:type" content="article">
 <meta property="og:title" content="In Search of an Understandable Consensus Algorithm (Extended Version)">
 <meta property="og:url" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/index.html">
 <meta property="og:site_name" content="KoPaNo&#39;s Blog">
-<meta property="og:description" content="寻找一种可理解的共识算法摘要Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明，Ra">
+<meta property="og:description" content="寻找一种可理解的共识算法摘要Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如leader、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure01.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure02.JPG">
@@ -21,8 +21,11 @@
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure06.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure07.JPG">
 <meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure08.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure09.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure10.JPG">
+<meta property="og:image" content="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure11.JPG">
 <meta property="article:published_time" content="2022-11-30T22:22:00.000Z">
-<meta property="article:modified_time" content="2023-03-27T03:04:06.678Z">
+<meta property="article:modified_time" content="2023-03-27T11:12:25.686Z">
 <meta property="article:author" content="KoPaNo">
 <meta property="article:tag" content="distributed system">
 <meta property="article:tag" content="consensus algorithm">
@@ -111,13 +114,13 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        <h1 id="寻找一种可理解的共识算法"><a href="#寻找一种可理解的共识算法" class="headerlink" title="寻找一种可理解的共识算法"></a>寻找一种可理解的共识算法</h1><h2 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h2><p>Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如领导者、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明，Raft比Paxos更容易被学生掌握。Raft还包括一个新的机制来改变群集成员，它使用重叠多数来保证安全。</p>
+        <h1 id="寻找一种可理解的共识算法"><a href="#寻找一种可理解的共识算法" class="headerlink" title="寻找一种可理解的共识算法"></a>寻找一种可理解的共识算法</h1><h2 id="摘要"><a href="#摘要" class="headerlink" title="摘要"></a>摘要</h2><p>Raft是一种共识算法，用于管理复制的日志。它产生的结果等同于（多）Paxos，并且它和Paxos一样高效，但它的结构与Paxos不同；这使得Raft比Paxos更容易理解，同时也为构建实用系统提供了更好的基础。为了提高可理解性，Raft将共识的关键元素分开，如leader、日志复制和安全等关键要素，并执行了更强的一致性，以减少必须考虑的状态数量。一个用户研究的结果表明，Raft比Paxos更容易被学生掌握。Raft还包括一个新的机制来改变群集成员，它使用重叠多数来保证安全。</p>
 <span id="more"></span>
 
 <h2 id="一、-引言"><a href="#一、-引言" class="headerlink" title="一、  引言"></a>一、  引言</h2><p>共识算法允许一组机器作为一致的团体工作，可以在一些成员的故障中幸存下来。正因为如此，它们在构建可靠的大规模软件系统中发挥了关键作用。Paxos[15, 16]在过去十年中主导了关于共识算法的讨论：大多数共识的实现都是基于Paxos或受其影响，Paxos已经成为教学生了解共识的主要工具。</p>
 <p>不幸的是，Paxos是相当难以理解的，尽管有许多尝试使它更容易理解。此外，它的结构需要复杂的变化以支持实际的系统。因此，无论是系统 构建者和学生都在为Paxos而努力。</p>
 <p>在我们为Paxos努力之后，我们开始寻找一种新的共识算法，为系统建设和教育提供一个更好的基础。我们的方法与普通方法不同，因为我们的主要目标是可理解性：我们能否为实用系统定义一个共识算法，并以一种明显比Paxos更容易学习的方式来描述它？此外，我们希望该算法能够促进直觉的发展，这对系统建设者来说是至关重要的。重要的是，不仅要让算法发挥作用，而且要让它显而易见地发挥作用。</p>
-<p>这项工作的结果是一种叫做Raft的共识算法。在设计Raft的过程中，我们应用了特定的技术来提高可理解性，包括分解（Raft将领导者选举、日志复制和安全分开）和减少状态空间（相对于Paxos，Raft减少了非确定性的程度和服务器之间的不一致方式）。对两所大学的43名学生进行的用户研究表明，Raft明显比Paxos更容易理解：在学习了两种算法之后，这些学生中有33人能够更好地回答有关Raft的问题，而不是有关Paxos的问题。</p>
+<p>这项工作的结果是一种叫做Raft的共识算法。在设计Raft的过程中，我们应用了特定的技术来提高可理解性，包括分解（Raft将leader选举、日志复制和安全分开）和减少状态空间（相对于Paxos，Raft减少了非确定性的程度和服务器之间的不一致方式）。对两所大学的43名学生进行的用户研究表明，Raft明显比Paxos更容易理解：在学习了两种算法之后，这些学生中有33人能够更好地回答有关Raft的问题，而不是有关Paxos的问题。</p>
 <p>Raft在许多方面与现有的共识算法相似（最显著的是Oki和Liskov的Viewstamped Replication[29, 22]），但它有几个新的特点。</p>
 <ul>
 <li><p><strong>强leader</strong>：与其他共识算法相比，Raft使用了一种更强的领导力形式。比如说。日志条目只从leader流向其他服务器。 这简化了对复制日志的管理 并使Raft更容易理解。</p>
@@ -215,20 +218,23 @@
 <p>Raft使用投票程序来防止candidate赢得选举，除非其日志包含所有已提交的条目。candidate必须与集群中的大多数人联系才能当选，这意味着每个已提交的条目必须至少存在于其中一个服务器中。如果candidate的日志至少和该多数人中的任何其他日志一样是最新的（这里的 “最新 “在下面有精确的定义），那么它将包含所有已提交的条目。RequestVote RPC实现了这一限制：RPC包括有关candidate日志的信息，如果投票人自己的日志比candidate的日志更及时，则拒绝投票。</p>
 <p>Raft通过比较日志中最后条目的索引和任期来确定两个日志中哪一个是最新的。如果日志的最后条目有不同的任期，那么任期较晚的日志是更最新的。如果日志以相同的任期结束，那么日志更长的就是最新的。</p>
 <h4 id="5-4-2-从前一个任期提交条目"><a href="#5-4-2-从前一个任期提交条目" class="headerlink" title="5.4.2 从前一个任期提交条目"></a>5.4.2 从前一个任期提交条目</h4><p>如第5.3节所述，一旦一个条目被存储在大多数服务器上，leader就知道其当前任期的条目被提交。如果leader在提交条目之前崩溃了，未来的leader将试图完成对该条目的复制。然而，尽管前一任期的条目被存储在大多数服务器上，leader仍然不能立即得出结论该条目已被提交。图8展示了这样一种情况：一个旧的日志条目被存储在大多数服务器上，但仍然可以被未来的leader所覆盖。</p>
-<p><img src="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure08.JPG" alt="不同任期的条目" title="不同任期的条目"></p>
-<div style="text-align: center;"><b>图8</b>：如果S1（任期T的leader）在其任期内提交了一个新的日志条目，而S5被选为后来任期U的leader，那么至少有一个服务器（S3）接受了这个日志条目，并且也投票给S5。</div>
+<p><img src="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure08.JPG" alt="图8" title="图8"></p>
+<div style="text-align: center;"><b>图8</b>：一个时间序列显示了为什么leader不能使用旧任期的日志条目来确定提交。在（a）中，S1是leader，并部分复制了索引2的日志条目。在(b)中，S1崩溃了；S5凭借S3、S4和它自己的投票当选为第3任期的leader，并接受了日志索引2的不同条目。在（c）中，S5崩溃了；S1重新启动，被选为leader，并继续复制。在这一点上，第2项的日志条目已经在大多数服务器上复制，但它没有被提交。如果S1像(d)那样崩溃，S5可以被选为leader（有S2、S3和S4的投票），并用它自己的第3任期的条目覆盖该条目。然而，如果S1在崩溃前在大多数服务器上复制了其当前任期的条目，如(e)，那么这个条目就被提交了（S5不能赢得选举）。在这一点上，日志中所有前面的条目也被提交。</div>
 
 <p>为了消除类似图8中的问题，Raft从不通过计算副本来提交以前的日志条目。只有leader当前任期的日志条目是通过计算副本来提交的；一旦当前任期的条目以这种方式被提交，那么由于日志匹配特性，所有之前的条目都被间接地提交。在某些情况下，leader可以安全地断定一个较早的日志条目已被提交（例如，如果该条目存储在每个服务器上），但Raft为简单起见采取了更保守的方法。</p>
 <p>Raft在提交规则中产生了这种额外的复杂性，因为当leader复制前几期的条目时，日志条目会保留其原来的任期编号。在其他共识算法中，如果一个新的leader复制之前 “任期 “的条目，它必须用新的 “任期编号 “来做。Raft的方法使得对日志条目的推理更加容易，因为它们在不同的时间和不同的日志中保持着相同的任期编号。此外，与其他算法相比，Raft的新leader从以前的任期中发送较少的日志条目（其他算法必须发送多余的日志条目，在它们被提交之前对其重新编号）。</p>
-<h4 id="5-4-3-安全性争论"><a href="#5-4-3-安全性争论" class="headerlink" title="5.4.3 安全性争论"></a>5.4.3 安全性争论</h4><p>考虑到完整的Raft算法，我们现在可以更精确地论证leader完整性属性是否成立（这个论证是基于安全证明的，见第9.2节）。我们假设了leader完整性属性不成立，然后我们证明其矛盾。假设任期T的leader（leaderT）从其任期中提交了一个日志条目，但是这个日志条目没有被未来某个任期的leader所存储。考虑最小的任期U &gt; T，其leader（leaderU）不存储该条目。</p>
+<h4 id="5-4-3-安全性争论"><a href="#5-4-3-安全性争论" class="headerlink" title="5.4.3 安全性争论"></a>5.4.3 安全性争论</h4><p>考虑到完整的Raft算法，我们现在可以更精确地论证leader完整性属性是否成立（这个论证是基于安全证明的，见第9.2节）。我们假设了leader完整性属性不成立，然后我们证明其矛盾。假设任期T的leader（leader<sub>T</sub>）从其任期中提交了一个日志条目，但是这个日志条目没有被未来某个任期的leader所存储。考虑最小的任期U &gt; T，其leader（leader<sub>U</sub>）不存储该条目。</p>
+<p><img src="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure09.JPG" alt="图9" title="图9"></p>
+<div style="text-align: center;"><b>图9</b>：如果S1（任期T的leader）在其任期内提交了一个新的日志条目，而S5被选为后来任期U的leader，那么至少有一个服务器（S3）接受了这个日志条目，并且也投票给S5。</div>
+
 <ol>
-<li>在leaderU当选时，已提交条目必须不在leaderU的日志中（leader从不删除或覆盖条目）。</li>
-<li>leaderT在集群的大多数上复制了该条目，而leaderU从集群的大多数上收到了投票。因此，至少有一台服务器（”投票者”）既接受了leaderT的条目，又投票给leaderU，如图9所示。投票者是达成矛盾的关键。</li>
-<li>投票者必须在投票给leaderU之前接受leaderT的已提交条目；否则它就会拒绝leaderT的AppendEntries请求（它当前的任期会比T高）。</li>
-<li>投票人在投票给leaderU时仍然存储了该条目，因为每个介入的leader都包含该条目（根据假设），leader从不删除条目，而follower只有在与leader冲突时才会删除条目。</li>
-<li>投票人将自己的投票权授予leaderU，所以leaderU的日志肯定和投票人的一样是最新的。这导致了两个矛盾中的一个矛盾。</li>
-<li>首先，如果投票人和leaderU共享最后一个日志任期，那么leaderU的日志至少要和投票人的一样长，所以它的日志包含了投票人日志中的每一个条目。这是一个矛盾，因为投票者包含了已提交的条目，而leaderU被认为不包含。</li>
-<li>否则，leaderU的最后一个日志任期一定比投票者的大。而且，它比T大，因为投票人的最后一个日志任期至少是T（它包含任期T的提交条目）。创建leaderU的最后一个日志任期的较早的leader，其日志中一定包含了已提交的条目（根据假设）。那么，根据日志匹配属性，leaderU的日志也必须包含已提交的条目，这就是一个矛盾。</li>
+<li>在leader<sub>U</sub>当选时，已提交条目必须不在leader<sub>U</sub>的日志中（leader从不删除或覆盖条目）。</li>
+<li>leader<sub>T</sub>在集群的大多数上复制了该条目，而leader<sub>U</sub>从集群的大多数上收到了投票。因此，至少有一台服务器（”投票者”）既接受了leader<sub>T</sub>的条目，又投票给leader<sub>U</sub>，如图9所示。投票者是达成矛盾的关键。</li>
+<li>投票者必须在投票给leader<sub>U</sub>之前接受leader<sub>T</sub>的已提交条目；否则它就会拒绝leader<sub>T</sub>的AppendEntries请求（它当前的任期会比T高）。</li>
+<li>投票人在投票给leader<sub>U</sub>时仍然存储了该条目，因为每个介入的leader都包含该条目（根据假设），leader从不删除条目，而follower只有在与leader冲突时才会删除条目。</li>
+<li>投票人将自己的投票权授予leader<sub>U</sub>，所以leader<sub>U</sub>的日志肯定和投票人的一样是最新的。这导致了两个矛盾中的一个矛盾。</li>
+<li>首先，如果投票人和leader<sub>U</sub>共享最后一个日志任期，那么leader<sub>U</sub>的日志至少要和投票人的一样长，所以它的日志包含了投票人日志中的每一个条目。这是一个矛盾，因为投票者包含了已提交的条目，而leader<sub>U</sub>被认为不包含。</li>
+<li>否则，leader<sub>U</sub>的最后一个日志任期一定比投票者的大。而且，它比T大，因为投票人的最后一个日志任期至少是T（它包含任期T的提交条目）。创建leader<sub>U</sub>的最后一个日志任期的较早的leader，其日志中一定包含了已提交的条目（根据假设）。那么，根据日志匹配属性，leader<sub>U</sub>的日志也必须包含已提交的条目，这就是一个矛盾。</li>
 <li>这就完成了这个矛盾。因此，所有大于T的任期的leader必须包含任期T中所有在任期T中已提交的条目。</li>
 <li>日志匹配属性保证了未来的leader也将包含间接提交的条目，如图8(d)中的索引2。</li>
 </ol>
@@ -239,12 +245,33 @@
 <p>leader选举是Raft中计时最关键的部分。只要系统满足以下时间要求，Raft就能选出并维持一个稳定的leader：</p>
 <p><code>broadcastTime ≪ electionTimeout ≪ MTBF</code></p>
 <p>在这个不等式中，broadcastTime是一台服务器向集群中的每台服务器并行发送RPC并接收其响应所需的平均时间；electionTimeout是第5.2节中描述的选举超时；MTBF是单台服务器的平均故障间隔时间。broadcast time应该比election timeout少一个数量级，这样leader就可以可靠地发送心跳信息，以防止follower开始选举；考虑到选举超时使用的随机方法，这种不平等也使得分裂投票不太可能发生。选举超时应该比MTBF小几个数量级，这样系统才能稳步前进。当leader崩溃时，系统将在大约选举超时的时间内不可用；我们希望这只占总体时间的一小部分。</p>
-<p>broadcastTime和MTBF是底层系统的属性，而elelctionTimeout是我们必选的。 Raft的RPC通常需要接收者将信息持久化，因此broadcastTime可能从0.5毫秒到20毫秒不等，具体取决于存储技术。因此，electionTimeout可能在10毫秒至500毫秒之间。典型服务器的MTBF一般是几个月甚至更长，很容易就满足了timing requirement。</p>
-<h2 id="六、-集群成员变更"><a href="#六、-集群成员变更" class="headerlink" title="六、  集群成员变更"></a>六、  集群成员变更</h2><h2 id="七、-日志压缩"><a href="#七、-日志压缩" class="headerlink" title="七、  日志压缩"></a>七、  日志压缩</h2><h2 id="八、-客户端交互"><a href="#八、-客户端交互" class="headerlink" title="八、  客户端交互"></a>八、  客户端交互</h2><h2 id="九、-实现和评估"><a href="#九、-实现和评估" class="headerlink" title="九、  实现和评估"></a>九、  实现和评估</h2><h2 id="十、-相关工作"><a href="#十、-相关工作" class="headerlink" title="十、  相关工作"></a>十、  相关工作</h2><h2 id="十一、-结论"><a href="#十一、-结论" class="headerlink" title="十一、  结论"></a>十一、  结论</h2>
+<p>broadcastTime和MTBF是底层系统的属性，而elelctionTimeout是我们必选的。 Raft的RPC通常需要接收者将信息持久化，因此broadcastTime可能从0.5毫秒到20毫秒不等，具体取决于存储技术。因此，electionTimeout可能在10毫秒至500毫秒之间。典型服务器的MTBF一般是几个月甚至更长，很容易就满足了计时的需求。</p>
+<h2 id="六、-集群成员变更"><a href="#六、-集群成员变更" class="headerlink" title="六、  集群成员变更"></a>六、  集群成员变更</h2><p>到目前为止，我们一直假设集群配置（参与共识算法的服务器集合）是固定的。在实践中，偶尔有必要改变配置，例如在服务器故障时更换服务器或改变复制的程度。虽然这可以通过关闭整个集群，更新配置文件，然后重新启动集群来完成，但这将使集群在改变期间不可用。此外，如果有任何手动步骤，就有可能出现操作错误。为了避免这些问题，我们决定将配置变更自动化，并将其纳入Raft共识算法中。</p>
+<p><img src="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure10.JPG" alt="图10" title="图10"></p>
+<div style="text-align: center;"><b>图10</b>：直接从一个配置切换到另一个配置是不安全的，因为不同的服务器会在不同时间切换。在这个例子中，集群从三个服务器增长到五个。不幸的是，有一个时间点，两个不同的leader可以在同一任期内当选，一个是旧配置的多数（C<sub>old</sub>），另一个是新配置的多数（C<sub>new</sub>）。</div>
+
+<p>为了使配置变更机制安全，在过渡期间必须没有任何一点可以让两个leader当选为同一任期。不幸的是，任何服务器直接从旧配置切换到新配置的方法都是不安全的。不可能一次性原子化地切换所有的服务器，所以集群在过渡期间有可能分裂成两个独立的多数（见图10）。</p>
+<p>为了确保安全，配置变化必须使用两阶段的方法。实现这两个阶段的方法有很多种。例如，一些系统 (如[22]）使用第一阶段禁用旧的配置，使其不能处理客户端请求；然后第二阶段启用新的配置。在Raft中，集群首先切换到一个过渡性配置，我们称之为联合共识；一旦联合共识被提交，系统就会过渡到新的配置。联合共识结合了新旧两种配置：</p>
+<ul>
+<li>日志条目被复制到两个配置中的所有服务器。</li>
+<li>任何一个配置的服务器都可以作为leader。</li>
+<li>达成协议（选举和进入承诺）需要新旧配置分别获得多数票。</li>
+</ul>
+<p>联合共识允许单个服务器在不同时间在配置之间转换，而不影响安全。此外，联合共识允许集群在整个配置变化过程中继续为客户请求提供服务。</p>
+<p><img src="/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/figure11.JPG" alt="图11" title="图11"></p>
+<div style="text-align: center;"><b>图11</b>：配置变更的时间线。虚线表示已经创建但未提交的配置条目，实线表示最新提交的配置条目。leader首先在其日志中创建 C<sub>old,new</sub> 配置条目，并将其提交给 C<sub>old,new</sub>（C<sub>old</sub> 的大多数和 C<sub>new</sub> 的大多数）。然后，它创建了C<sub>new</sub>条目，并将其提交给多数的C<sub>new</sub>。在这个时间点上，C<sub>old</sub>和C<sub>new</sub>都不能独立做出决定。</div>
+
+<p>集群配置使用复制日志中的特殊条目进行存储和通信；图11说明了配置变化过程。当leader收到将配置从C<sub>old</sub>改成C<sub>new</sub>的请求时，它将联合共识的配置（图中的C<sub>old,new</sub>）存储为一个日志条目，并使用前面描述的机制复制该条目。一旦某个服务器将新的配置条目添加到其日志中，它就会将该配置用于所有未来的决策（一个服务器总是使用其日志中的最新配置，无论该条目是否被提交）。这意味着leader将使用 C<sub>old,new</sub> 的规则来决定 C<sub>old,new</sub> 的日志条目何时被提交。如果leader崩溃了，一个新的leader可能会在C<sub>old</sub>或C<sub>old,new</sub>下被选择，这取决于获胜的候选人是否已经收到了C<sub>old,new</sub>。在任何情况下，C<sub>new</sub>都不能在这段时间内做出单边决定。</p>
+<p>一旦C<sub>old,new</sub>被承诺，无论是C<sub>old</sub>还是C<sub>new</sub>都不能在未经对方批准的情况下做出决定，而且leader完整性属性确保只有拥有C<sub>old,new</sub>日志记录的服务器才能被选为leader。现在，leader创建描述C<sub>new</sub>的日志条目并将其复制到集群中是安全的。同样，这个配置一旦被看到，就会在每个服务器上生效。当新的配置在C<sub>new</sub>的规则下被提交后，旧的配置就不重要了，不在新配置中的服务器可以被关闭。如图11所示，没有任何时候C<sub>old</sub>和C<sub>new</sub>可以同时做出单边决定；这保证了安全。</p>
+<p>对于重新配置，还有三个问题需要解决。第一个问题是，新服务器最初可能不会存储任何日志条目。如果它们在这种状态下被添加到集群中，可能需要相当长的时间才能赶上，在此期间，可能无法提交新的日志条目。为了避免可用性差距，Raft在配置改变之前引入了一个额外的阶段，在这个阶段，新的服务器作为非投票成员加入集群（leader将日志条目复制给他们，但他们不被考虑为多数）。一旦新的服务器赶上了集群的其他部分、 重新配置就可以按上述方法进行。</p>
+<p>第二个问题是，集群leader可能不是新配置的一部分。在这种情况下，一旦它提交了C<sub>new</sub>日志条目，leader就会下台（返回到跟随者状态）。这意味着会有一段时间（在它提交C<sub>new</sub>的时候），leader在管理一个不包括自己的集群；它复制日志条目，但不把自己算在多数中。leader过渡发生在C<sub>new</sub>被提交的时候，因为这是新配置可以独立运行的第一个点（它将始终有可能从C<sub>new</sub>中选择一个leader）。在这之前，可能只有C<sub>old</sub>的一个服务器可以被选为leader。</p>
+<p>第三个问题是，被移除的服务器（那些不在C<sub>new</sub>中的服务器）会扰乱集群。这些服务器不会收到心跳，所以它们会超时并开始新的选举。然后他们会发送带有新任期编号的RequestVote RPCs，这将导致当前的leader恢复到追随者状态。一个新的leader最终将被选出，但被移除的服务器将再次超时，这个过程将重复，导致可用性差。</p>
+<p>为了防止这个问题，当服务器认为存在一个当前的leader时，他们会忽略RequestVote RPC。具体来说，如果一个服务器在听到当前leader的最小选举超时内收到RequestVote RPC，它不会更新其任期或授予其投票。这并不影响正常的选举，每个服务器在开始选举之前至少要等待一个最小的选举超时。然而，这有助于避免被移除的服务器的干扰：如果一个leader能够得到其集群的心跳，那么它就不会被较大的任期数字所废黜。</p>
+<h2 id="七、-日志压缩"><a href="#七、-日志压缩" class="headerlink" title="七、  日志压缩"></a>七、  日志压缩</h2><h2 id="八、-客户端交互"><a href="#八、-客户端交互" class="headerlink" title="八、  客户端交互"></a>八、  客户端交互</h2><h2 id="九、-实现和评估"><a href="#九、-实现和评估" class="headerlink" title="九、  实现和评估"></a>九、  实现和评估</h2><h2 id="十、-相关工作"><a href="#十、-相关工作" class="headerlink" title="十、  相关工作"></a>十、  相关工作</h2><h2 id="十一、-结论"><a href="#十一、-结论" class="headerlink" title="十一、  结论"></a>十一、  结论</h2>
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/" data-id="clfq8wjxj0000gsnd0et3htyp" data-title="In Search of an Understandable Consensus Algorithm (Extended Version)" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/11/30/In-Search-of-an-Understandable-Consensus-Algorithm/" data-id="clfqqchel0000g1op5yngaw2p" data-title="In Search of an Understandable Consensus Algorithm (Extended Version)" class="article-share-link">Share</a>
       
       
       
