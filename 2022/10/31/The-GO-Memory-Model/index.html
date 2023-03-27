@@ -6,15 +6,15 @@
   
   <title>The Go Memory Model | KoPaNo&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="Go内存模型Version of June 6, 2022 介绍Go 内存模型指定了以下条件,来保证在某一个goroutine中对一个变量进行读操作时,可以观察到在不同的GoRoutine中对该变量进行写操作产生的值。">
+  <meta name="description" content="Go内存模型Version of June 6, 2022 介绍Go 内存模型指定了以下条件,来保证在某一个 goroutine 中对一个变量进行读操作时,可以观察到在不同的 goroutine 中对该变量进行写操作产生的值。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="The Go Memory Model">
 <meta property="og:url" content="https://tinykopano.github.io/2022/10/31/The-GO-Memory-Model/index.html">
 <meta property="og:site_name" content="KoPaNo&#39;s Blog">
-<meta property="og:description" content="Go内存模型Version of June 6, 2022 介绍Go 内存模型指定了以下条件,来保证在某一个goroutine中对一个变量进行读操作时,可以观察到在不同的GoRoutine中对该变量进行写操作产生的值。">
+<meta property="og:description" content="Go内存模型Version of June 6, 2022 介绍Go 内存模型指定了以下条件,来保证在某一个 goroutine 中对一个变量进行读操作时,可以观察到在不同的 goroutine 中对该变量进行写操作产生的值。">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2022-10-31T22:22:00.000Z">
-<meta property="article:modified_time" content="2023-03-26T04:24:38.430Z">
+<meta property="article:modified_time" content="2023-03-27T03:04:06.690Z">
 <meta property="article:author" content="KoPaNo">
 <meta property="article:tag" content="programming language">
 <meta property="article:tag" content="go">
@@ -102,10 +102,10 @@
     <div class="e-content article-entry" itemprop="articleBody">
       
         <h1 id="Go内存模型"><a href="#Go内存模型" class="headerlink" title="Go内存模型"></a>Go内存模型</h1><p>Version of June 6, 2022</p>
-<h2 id="介绍"><a href="#介绍" class="headerlink" title="介绍"></a>介绍</h2><p>Go 内存模型指定了以下条件,来保证在某一个goroutine中对一个变量进行读操作时,可以观察到在不同的GoRoutine中对该变量进行写操作产生的值。</p>
+<h2 id="介绍"><a href="#介绍" class="headerlink" title="介绍"></a>介绍</h2><p>Go 内存模型指定了以下条件,来保证在某一个 goroutine 中对一个变量进行读操作时,可以观察到在不同的 goroutine 中对该变量进行写操作产生的值。</p>
 <span id="more"></span>
 
-<h3 id="建议"><a href="#建议" class="headerlink" title="建议"></a>建议</h3><p>程序中改变的数据会被多个goroutine同时访问时,必须序列化此类访问。</p>
+<h3 id="建议"><a href="#建议" class="headerlink" title="建议"></a>建议</h3><p>程序中改变的数据会被多个 goroutine 同时访问时,必须序列化此类访问。</p>
 <p>若要序列化访问,请使用通道操作或其他同步原语保护数据,例如 sync 和 sync&#x2F;atomic 中的那些。</p>
 <p>如果你必须阅读本文档的其余部分才能了解你的程序的行为, 那你可太聪明了。</p>
 <p>不要自作聪明。</p>
@@ -121,8 +121,8 @@
 <li>正在访问的内存位置或变量,以及</li>
 <li>该操作读取或写入的值。<br>某些内存操作是类似读取的，包括读取、原子读取、互斥锁和通道接收。 其他内存操作类似写入，包括写入、原子写入、互斥解锁、通道发送和通道关闭。 有些，例如原子比较和交换，既是类似读的，也是类似写的。</li>
 </ul>
-<p>goroutine执行被建模为由单个goroutine执行的一组内存操作。</p>
-<p><strong>要求 1</strong>： 每个goroutine中的内存操作必须对应于该goroutine的正确顺序执行，给定从内存中读出和写入的值。该执行必须符合先序关系，定义为Go语言规范为Go的控制流结构所规定的部分顺序要求，以及表达式的评估顺序。</p>
+<p>goroutine 执行被建模为由单个 goroutine 执行的一组内存操作。</p>
+<p><strong>要求 1</strong>： 每个 goroutine 中的内存操作必须对应于该 goroutine 的正确顺序执行，给定从内存中读出和写入的值。该执行必须符合先序关系，定义为Go语言规范中Go的控制流结构所规定的部分顺序要求，以及表达式的评估顺序。</p>
 <p><strong>要求2</strong>：对于一个给定的程序执行，映射W，当限于同步操作时，必须可以用一些隐含的同步操作的总顺序来解释，该顺序与排序和这些操作所读写的值一致。</p>
 <p>如果一个同步的读类存储器操作r观察到一个同步的写类存储器操作w（也就是说，如果W(r)&#x3D;w），那么w就同步于r。</p>
 <p>发生在前的关系被定义为顺序在前和同步在前关系的联合的反式闭合。</p>
@@ -136,7 +136,7 @@
 <p>请注意，如果内存位置x上没有读写或写数据竞争，那么x上的任何读r只有一个可能的W(r)：在发生之前的顺序中紧接在它之前的单一w。</p>
 <p>更一般地说，可以证明任何Go程序是 data-race-free的，也就是说，它没有存在读写数据竞争的程序执行，其结果只能由一些顺序一致的goroutine执行交错来解释。(证明方法与上文引用的Boehm和Adve的论文第7节相同。)这个属性被称为DRF-SC。</p>
 <p>正式定义的意图是与其他语言（包括C、C++、Java、JavaScript、Rust和Swift）为race-free程序提供的DRF-SC保证相匹配。</p>
-<p>Go语言的某些操作，如goroutine创建和内存分配，都是同步操作。这些操作对synchronized-before部分顺序的影响在下面的 “同步”部分有记录。各个包负责为自己的操作提供类似的文档。</p>
+<p>Go语言的某些操作，如 goroutine 创建和内存分配，都是同步操作。这些操作对synchronized-before部分顺序的影响在下面的 “同步”部分有记录。各个包负责为自己的操作提供类似的文档。</p>
 <h2 id="包含数据竞争的程序的实现限制"><a href="#包含数据竞争的程序的实现限制" class="headerlink" title="包含数据竞争的程序的实现限制"></a>包含数据竞争的程序的实现限制</h2><p>上一节给出了data-race-free程序执行的正式定义。本节非正式地描述了实现必须为包含竞争的程序提供的语义。</p>
 <p>首先，任何实现都可以在检测到数据竞争时，报告该竞争并停止程序的执行。使用ThreadSanitizer（通过 “go build -race “访问）的实现正是这样做的。</p>
 <p>否则，对不大于一个机器字的内存位置x的读取必须观察到一些写w，使得r在w之前不会发生，并且没有写w’，使得w在w’之前发生，w’在r之前发生。</p>
@@ -144,14 +144,14 @@
 <p>大于一个机器字的内存位置的读取被鼓励，但不需要满足与字大小的内存位置相同的语义，观察一个允许的写w。由于性能的原因，实现可以将更大的操作作为一组单独的机器字大小的操作，以一个未指定的顺序。这意味着多字数据结构上的竞争可能导致不一致的值，而不是对应于单一的写。当这些值依赖于内部（指针、长度）或（指针、类型）对的一致性时，如大多数Go实现中的接口值、map、切片和字符串，这种竞争又会导致任意的内存损坏。</p>
 <p>下面的 “不正确的同步 “部分给出了不正确的同步的例子。</p>
 <p>对实现的限制的例子在下面的 “不正确的编译”一节中给出。</p>
-<h2 id="同步"><a href="#同步" class="headerlink" title="同步"></a>同步</h2><h3 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h3><p>程序初始化在一个goroutine中运行，但这个goroutine可以创建其他goroutine，这些goroutine同时运行。</p>
+<h2 id="同步"><a href="#同步" class="headerlink" title="同步"></a>同步</h2><h3 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h3><p>程序初始化在一个 goroutine 中运行，但这个 goroutine 可以创建其他 goroutine ，这些 goroutine 同时运行。</p>
 <p>如果一个包p导入了包q，那么q的init函数的完成会在p的任何一个函数开始之前发生。</p>
 <p>所有init函数的完成在函数main.main开始之前是同步的。</p>
 <h3 id="创建Goroutine"><a href="#创建Goroutine" class="headerlink" title="创建Goroutine"></a>创建Goroutine</h3><p>启动一个新的goroutine的go语句在goroutine的执行开始之前就已经同步了。</p>
 <p>例如，在这个程序中</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">var a string</span><br><span class="line"></span><br><span class="line">func f() &#123;</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func hello() &#123;</span><br><span class="line">	a = &quot;hello, world&quot;</span><br><span class="line">	go f()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>调用hello方法会在未来某个时间打印“hello world”（可能是在hello方法返回）。</p>
-<h3 id="销毁Goroutine"><a href="#销毁Goroutine" class="headerlink" title="销毁Goroutine"></a>销毁Goroutine</h3><p>一个goroutine的退出并不保证在程序中的任何事件之前同步进行。例如，在这个程序中。</p>
+<h3 id="销毁Goroutine"><a href="#销毁Goroutine" class="headerlink" title="销毁Goroutine"></a>销毁Goroutine</h3><p>一个 goroutine的 退出并不保证在程序中的任何事件之前同步进行。例如，在这个程序中。</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">var a string</span><br><span class="line"></span><br><span class="line">func hello() &#123;</span><br><span class="line">	go func() &#123; a = &quot;hello&quot; &#125;()</span><br><span class="line">	print(a)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>对a的赋值后面没有任何同步事件，所以它不能保证被其他goroutine观察到。事实上，一个积极的编译器可能会删除整个go语句。</p>
 <p>如果一个goroutine的效果必须被另一个goroutine观察到，请使用同步机制，如锁或通道通信来建立一个相对顺序。</p>
@@ -237,7 +237,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://tinykopano.github.io/2022/10/31/The-GO-Memory-Model/" data-id="clfowc8170005gdov6ozs6zz2" data-title="The Go Memory Model" class="article-share-link">Share</a>
+      <a data-url="https://tinykopano.github.io/2022/10/31/The-GO-Memory-Model/" data-id="clfq8wjxw0005gsnddajb79tq" data-title="The Go Memory Model" class="article-share-link">Share</a>
       
       
       
