@@ -7,12 +7,12 @@ logo: /img/logo.svg
 # Page metadata configurations
 head:
     # URL or path to the website's icon
-    favicon: /img/favicon.ico
+    favicon: /img/favicon.png
     # Web application manifests configuration
     # https://developer.mozilla.org/en-US/docs/Web/Manifest
     manifest:
         # Name of the web application (default to the site title)
-        name: 
+        name: KoPaNo‘s Blog
         # The displayed name of the web application
         # when there is not enough space to display full name
         short_name: 
@@ -229,11 +229,11 @@ widgets:
         position: left
         type: profile
         # Author name
-        author: Your name
+        author: KoPaNo
         # Author title
-        author_title: Your title
+        author_title: Tramp
         # Author's current location
-        location: Your location
+        location: Mars
         # URL or path to the avatar image
         avatar: 
         # Whether show the rounded avatar image
