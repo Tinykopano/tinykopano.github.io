@@ -107,7 +107,7 @@ MapReduce接口有很多不同的实现，需要根据环境来做出合适的�
 
 通过自动的将输入数据分区成M个分片，Map调用被分配到多台机器上运行。数据的分片能够在不同的机器上并行处理。使用分区函数（如，hash(key) mod R）将中间结果的key进行分区成R个分片，Reduce调用也被分配到多台机器上运行。分区的数量（R）和分区函数是由用户指定的。
 
-![执行概述](figure01.JPG "执行概述")
+![执行概述](figure01.JPG)
 
 <div style="text-align: center;"><b>图1</b>：执行概述</div>
 
@@ -272,7 +272,7 @@ map(String name, String contents):
 
 这个grep程序扫描了大概1010个100字节大小的记录，查找出现概率相对较小的3个字符的模式（这个模式出现在92337个记录中）。输入被分割成接近64MB的片（M=15000），整个输出被放到一个文件中（R=1）。
 
-![数据传输速率](figure02.JPG "数据传输速率")
+![数据传输速率](figure02.JPG)
 
 <div style="text-align: center;"><b>图2</b>：数据传输速率</div>
 
@@ -288,7 +288,7 @@ map(String name, String contents):
 
 这个基准测试的分区函数内置了key的分区信息。在一个普通的排序程序中，我们将增加一个预处理MapReduce操作，它能够对key进行抽样，通过key的抽样分布来计算最终排序处理的分割点。
 
-![排序程序](figure03.JPG "排序程序")
+![排序程序](figure03.JPG)
 
 <div style="text-align: center;"><b>图3</b>：对于排序程序的不同执行过程随时间的数据传输速率</div>
 
@@ -320,13 +320,13 @@ map(String name, String contents):
 - 从大量新应用和新产品的网页中抽取特性（如，从大量的位置查询页面中抽取地理位置信息）
 - 大规模图形计算
 
-![实例](figure04.JPG "实例")
+![实例](figure04.JPG)
 
 <div style="text-align: center;"><b>图4</b>：随时间变化的MapReduce实例</div>
 
 图4中显示了在我们的源码管理系统中，随着时间的推移，MapReduce程序的数量有明显的增加，从2003年早期的0增加到2004年9月时的900个独立的实例。MapReduce如此的成功，因为它使利用半个小时编写的一个简单程序能够高效的运行在一千台机器上成为可能，这极大的加快了开发和原型设计的周期。此外，它允许没有分布式和/或并行系统经验的开发者能够利用这些资源开发出分布式应用。
 
-![任务](table01.JPG "任务")
+![任务](table01.JPG)
 
 <div style="text-align: center;"><b>表1</b>： 2004年8月运行的MapReduce任务</div>
 

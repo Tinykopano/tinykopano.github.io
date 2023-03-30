@@ -31,7 +31,7 @@ Bressoud和Schneider描述了一个针对HP PA-RISC平台的故障容忍虚拟�
 
 ## 二、  基础的故障容忍设计
 
-![基本FT配置](figure01.JPG )
+![基本FT配置](figure01.JPG)
 
 <div style="text-align: center;"><b>图1</b>：基本FT配置。</div>
 
@@ -69,7 +69,7 @@ Bressoud 和 Schneider提到将VM执行切分成不同的时代（epoch），其
 
 请注意，输出规则没有说明关于停止主VM执行的任何事。我们只需要延迟输出发送，但 VM 本身可以继续执行。由于操作系统通过异步中断来指示完成，因此可以执行非阻塞的网络和磁盘输出，VM可以轻松地继续执行并且不一定会立即受到输出延迟的影响。相比之下，以前的工作 [3, 9] 通常必须在执行输出之前完全停止主VM，直到备份 VM 已确认来自主 VM 的所有必要信息。
 
-![FT协议](figure02.JPG )
+![FT协议](figure02.JPG)
 
 <div style="text-align: center;"><b>图2</b>：FT协议。</div>
 
@@ -101,7 +101,7 @@ Bressoud 和 Schneider提到将VM执行切分成不同的时代（epoch），其
 
 ### 3.2 管理日志通道
 
-![FT日志缓存和通道](figure03.JPG )
+![FT日志缓存和通道](figure03.JPG)
 
 <div style="text-align: center;"><b>图3</b>：FT日志缓存和通道。</div>
 
@@ -147,7 +147,7 @@ VMware vSphere针对VM网络提供了很多性能优化。一些优化是基于�
 
 ### 4.1 共享 vs. 非共享磁盘
 
-![FT非共享磁盘配置](figure04.JPG )
+![FT非共享磁盘配置](figure04.JPG)
 
 <div style="text-align: center;"><b>图4</b>：FT非共享磁盘配置。</div>
 
@@ -177,7 +177,7 @@ VMware vSphere针对VM网络提供了很多性能优化。一些优化是基于�
 
 ### 5.1 基本性能结果
 
-![基本性能结果](table01.JPG )
+![基本性能结果](table01.JPG)
 
 <div style="text-align: center;"><b>表1</b>：基本性能结果。</div>
 
@@ -193,7 +193,7 @@ VMware vSphere针对VM网络提供了很多性能优化。一些优化是基于�
 
 ### 5.2 网络基准测试
 
-![日志通道对网络传输性能的影响](table02.JPG )
+![日志通道对网络传输性能的影响](table02.JPG)
 
 <div style="text-align: center;"><b>表2</b>：日志通道对网络传输性能的影响。</div>
 
