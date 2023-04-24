@@ -231,9 +231,9 @@ widgets:
         # Author name
         author: KoPaNo
         # Author title
-        author_title: Tramp
+        author_title: Ronin,Bard
         # Author's current location
-        location: Mars
+        location: Mars,Galaxy
         # URL or path to the avatar image
         avatar: /img/avatar.png
         # Whether show the rounded avatar image
@@ -241,18 +241,18 @@ widgets:
         # Email address for the Gravatar
         gravatar: 
         # URL or path for the follow button
-        follow_link: https://github.com/ppoffice
+        follow_link: https://github.com/Tinykopano
         # Links to be shown on the bottom of the profile widget
         social_links:
             Github:
                 icon: fab fa-github
-                url: https://github.com/ppoffice
+                url: https://github.com/Tinykopano
             Facebook:
                 icon: fab fa-facebook
                 url: https://facebook.com
             Twitter:
                 icon: fab fa-twitter
-                url: https://twitter.com
+                url: https://twitter.com/KopanoTiny
             Dribbble:
                 icon: fab fa-dribbble
                 url: https://dribbble.com
